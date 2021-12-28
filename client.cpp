@@ -33,7 +33,9 @@ int main(int argc, char **argv)
 	if((connect(sockfd, (struct sockaddr*) &addr, sizeof(addr))) == -1)
 		errexit("Could not connect to the socket.");
 
-	while(true) {
+	bool running = true;
+
+	while(running) {
 		//empty the string
 		input[0] = 0;
 		output[0] = 0;
@@ -53,7 +55,7 @@ int main(int argc, char **argv)
 				errexit("Failed to receive data from the server.");
 
 			if(strcmp(output, "exit") == 0)
-				break;
+				running = false;
 
 			std::cout << output << '\n';
 		}

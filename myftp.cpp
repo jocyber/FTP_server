@@ -24,7 +24,7 @@ int changeDirectory(char path[], char newDirectory[]) {
 	DIR *direct = opendir(path);
 	struct dirent *dir;
 
-	while((dir = readdir(direct) != NULL) {
+	while((dir = readdir(direct)) != NULL) {
 		struct stat sb;
 
 		if(stat(path, &sb) == -1)
