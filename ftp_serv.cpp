@@ -2,6 +2,7 @@
 #include <sys/un.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 #include "myftp.h"
 
 using uint = unsigned int;
@@ -10,14 +11,14 @@ using uint = unsigned int;
 
 void exitFailure(const std::string str) {
 	std::cout << str << '\n';
-	exit(1);
+	exit(EXIT_FAILURE);
 }
+
+void* handleClient(void *socket);
 
 int main(int argc, char **argv) 
 {
 	int sockfd, client_sock;
-	char buffer[BUFFSIZE];
-	char message[BUFFSIZE];
 	char curr_direct[BUFFSIZE] = "./";
 
 	//AF_INET = IPv4
@@ -40,21 +41,41 @@ int main(int argc, char **argv)
 	if(listen(sockfd, SOMAXCONN) == -1)
 		exitFailure("Could not set up a passive socket connection.");
 
-	if((client_sock = accept(sockfd, NULL, NULL)) == -1)
-		exitFailure("Could not accept active socket connection.");
+	//create a separate thread for each client that connects
+	pthread_t tid[SOMAXCONN];
+	int i = 0;
 	
-	//server runs forever until an error occurs
+	while(true) {
+		if((client_sock = accept(sockfd, NULL, NULL)) == -1)
+			exitFailure("Failed to accept client connection.");
+
+		//send message when the thread buffer gets full
+		if(i >= SOMAXCONN) {
+			continue; //fill in code here
+		}
+
+		//create a thread and pass the handleClient function pointer and its parameter
+		int	thStatus = pthread_create(&tid[i++], NULL, handleClient, &client_sock);
+
+		if(thStatus != 0)
+			exitFailure("Failed to create thread.");
+
+		if(pthread_join(tid[i--], NULL) != 0)
+			exitFailure("Failed to end thread.");
+	}
+}
+
+//function to handle an individual client
+void* handleClient(void *socket) {
+	int client_sock = *(int *) socket;
+	char buffer[BUFFSIZE];
+	char message[BUFFSIZE];
+
 	while(true) {
 
 		//receive input from the client
 		if((recv(client_sock, buffer, BUFFSIZE, 0)) == -1) {
-			//if client disconnected, then accept a new connection
-			if((client_sock = accept(sockfd, NULL, NULL)) == -1)
-				exitFailure("Could not accept active socket connection.");
-
-			//refill the buffer with the data from the new connection
-			if(recv(client_sock, buffer, BUFFSIZE, 0) == -1)
-				exitFailure("Failed to receive data from the client.");
+			exitFailure("Failed to receive data from the client.");
 		}
 
 		//general logic for the ftp server starts here
@@ -73,6 +94,8 @@ int main(int argc, char **argv)
 			//close the socket when the client has left the active session
 			if(close(client_sock) == -1)
 				exitFailure("Could not close the active socket connection.");
+
+			pthread_exit(EXIT_SUCCESS);
 		}
 		else {
 			strcpy(message, "Input not recognized.");
@@ -83,3 +106,4 @@ int main(int argc, char **argv)
 		buffer[0] = 0;
 	}
 }
+
