@@ -24,4 +24,6 @@ ftp:
 memleak:
 	valgrind --leak-check=full ./$(SERVER)
 
+commit:
+	./.commit.sh
 
