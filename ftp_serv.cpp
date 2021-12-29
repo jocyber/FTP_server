@@ -9,6 +9,7 @@
 using uint = unsigned int;
 #define PORT 2000
 #define BUFFSIZE 512
+unsigned int numConnections = 0;
 
 void exitFailure(const std::string str) {
 	std::cout << str << '\n';
@@ -43,45 +44,27 @@ int main(int argc, char **argv)
 		exitFailure("Could not set up a passive socket connection.");
 
 	//create a separate thread for each client that connects
-	pthread_t tid[SOMAXCONN];
-	std::bitset<SOMAXCONN> bits;
-
-	int i = 0;
+	pthread_t tid;
 	
 	while(true) {
 		if((client_sock = accept(sockfd, NULL, NULL)) == -1)
 			exitFailure("Failed to accept client connection.");
 
-		//if max number of connections is reached or the current thread is active
-		if(i >= SOMAXCONN || bits.test(i)) {
-			bool flag = false;
+		//if max number of connections is reached
+		if(numConnections >= SOMAXCONN) {
+			//send a message to the client
+			if(close(client_sock) == -1)
+				exitFailure("Failed to close the client socket");
 
-			//search for a spot in the thread buffer that is not occupied
-			for(unsigned int j = 0; j < SOMAXCONN; ++j) {
-				if(!bits.test(j)) {
-					i = j; //move current thread position to a spot that is unoccupied
-					flag = true;
-					break;
-				}
-			}
-
-			//send a message if all bits are set (i.e none of the threads are available)
-			if(!flag)
-				continue;
+			continue;
 		}
 
 		//create a thread and pass the handleClient function pointer and its parameter
-		bits.set(i);
-		int	thStatus = pthread_create(&tid[i++], NULL, handleClient, &client_sock);
+		int	thStatus = pthread_create(&tid, NULL, handleClient, &client_sock);
+		numConnections++;
 
 		if(thStatus != 0)
 			exitFailure("Failed to create thread.");
-
-		if(pthread_join(tid[i - 1], NULL) != 0)
-			exitFailure("Failed to end thread.");
-		else {
-			bits.flip(i - 1); //set thread bit to inactive
-		}
 	}
 }
 
@@ -113,6 +96,9 @@ void* handleClient(void *socket) {
 			//close the socket when the client has left the active session
 			if(close(client_sock) == -1)
 				exitFailure("Could not close the active socket connection.");
+
+			if(numConnections > 0)
+				numConnections--;
 
 			pthread_exit(EXIT_SUCCESS);
 		}
