@@ -92,10 +92,12 @@ void* handleClient(void *socket) {
 			std::string path = client_input.substr(3, client_input.length());	
 
 			//change the directory
-			if(chdir(path.c_str()) == -1)
-				exitFailure("No directory name {" + path + "}");
-
-			send(client_sock, message, BUFFSIZE, 0);
+			if(chdir(path.c_str()) == -1) {
+				std::string error = "No directory named {" + path + "}\n";
+				send(client_sock, error.c_str(), BUFFSIZE, 0); 
+			}
+			else
+				send(client_sock, message, BUFFSIZE, 0);
 		}
 		else if(strcmp(buffer, "exit") == 0) {
 			strcpy(message, "exit");
