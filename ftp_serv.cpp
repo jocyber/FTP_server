@@ -75,19 +75,27 @@ void* handleClient(void *socket) {
 	char message[BUFFSIZE];
 
 	while(true) {
-
 		//receive input from the client
 		if((recv(client_sock, buffer, BUFFSIZE, 0)) == -1)
 			exitFailure("Failed to receive data from the client.");
 
+		std::string client_input(buffer);	
+
 		//general logic for the ftp server starts here
 		//compare the client input to different options.
-		if(strcmp(buffer, "ls") == 0) {
+		if(client_input.compare("ls") == 0) {
 			listDirectories(message);
 			send(client_sock, message, BUFFSIZE, 0);
 		}
-		else if(strcmp(buffer, "cd") == 0) {
-			; //handle change directory
+		else if(client_input.substr(0, 2).compare("cd") == 0) {
+			//buffer without cd
+			std::string path = client_input.substr(3, client_input.length());	
+
+			//change the directory
+			if(chdir(path.c_str()) == -1)
+				exitFailure("No directory name {" + path + "}");
+
+			send(client_sock, message, BUFFSIZE, 0);
 		}
 		else if(strcmp(buffer, "exit") == 0) {
 			strcpy(message, "exit");

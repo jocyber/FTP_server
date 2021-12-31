@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include <string.h>
 
 #define PORT 2000
 #define BUFFSIZE 512
@@ -16,6 +17,7 @@ void errexit(const std::string message);
 int main(int argc, char **argv)
 {
 	int sockfd;
+	std::string input;
 
 	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 		errexit("Failed to create a socket.");
@@ -27,7 +29,6 @@ int main(int argc, char **argv)
 	addr.sin_port = htons(PORT);
 	addr.sin_addr.s_addr = INADDR_ANY;
 
-	char input[BUFFSIZE] = "";
 	char output[BUFFSIZE] = "";
 
 	if((connect(sockfd, (struct sockaddr*) &addr, sizeof(addr))) == -1)
@@ -37,18 +38,18 @@ int main(int argc, char **argv)
 
 	while(running) {
 		//empty the string
-		input[0] = 0;
+		input.clear();
 		output[0] = 0;
 		std::cout << "/directory$ ";
 
-		if(scanf("%s", input) == -1)
-			errexit("Unknown problem when reading input.");
+		std::getline(std::cin, input);
 
 		//guard against buffer overflow
-		if(sizeof(input) > BUFFSIZE)
+		if(input.length() > BUFFSIZE)
 			std::cerr << "Buffer overflow.\n";
 		else {
-			send(sockfd, input, BUFFSIZE, 0);
+			std::cout << input.c_str() << '\n';
+			send(sockfd, input.c_str(), BUFFSIZE, 0);
 		
 			//print what the server responds with
 			if(recv(sockfd, output, BUFFSIZE, 0) == -1)
