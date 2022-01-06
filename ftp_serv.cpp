@@ -3,7 +3,7 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <pthread.h>
-#include <bitset>
+#include <unistd.h>
 #include "myftp.h"
 
 using uint = unsigned int;
@@ -16,6 +16,7 @@ void exitFailure(const std::string str) {
 	exit(EXIT_FAILURE);
 }
 
+//function pointer to main logic
 void* handleClient(void *socket);
 
 int main(int argc, char **argv) 
@@ -56,7 +57,7 @@ int main(int argc, char **argv)
 			if(close(client_sock) == -1)
 				exitFailure("Failed to close the client socket");
 
-			continue;
+			continue; //jump back to the beginnning of the loop
 		}
 
 		//create a thread and pass the handleClient function pointer and its parameter
@@ -97,7 +98,16 @@ void* handleClient(void *socket) {
 				send(client_sock, error.c_str(), BUFFSIZE, 0); 
 			}
 			else
-				send(client_sock, message, BUFFSIZE, 0);
+				send(client_sock, message, BUFFSIZE, 0);//send an empty message to indicate success
+		}
+		else if(client_input.compare("pwd") == 0) { //print working directory
+				if((message = getcwd(message, PATH_MAX)) == NULL) {
+					char response[] = "Path name too long.";
+					send(client_sock, response, BUFFSIZE, 0);
+				}
+				else {
+					send(client_sock, message, BUFFSIZE, 0);
+				}
 		}
 		else if(strcmp(buffer, "exit") == 0) {
 			strcpy(message, "exit");

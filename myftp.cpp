@@ -17,27 +17,3 @@ void listDirectories(char message[]) {
 	}
 }
 
-int changeDirectory(char path[], char newDirectory[]) {
-	if(strcmp(newDirectory, ".") == 0)
-		return 0;
-	
-	DIR *direct = opendir(path);
-	struct dirent *dir;
-
-	while((dir = readdir(direct)) != NULL) {
-		struct stat sb;
-
-		if(stat(path, &sb) == -1)
-			continue;
-
-		if(S_ISDIR(sb.st_mode) && strcmp(newDirectory, dir->d_name) == 0) {
-			;//change directory
-		}
-	}
-	
-	return -1;
-}
-
-
-
-

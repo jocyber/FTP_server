@@ -11,10 +11,6 @@
 #define BUFFSIZE 512
 
 void listDirectories(char message[]);
-int changeDirectory(char path[]);
-void deleteFile(char direct[]);
-void makeDirectory();
-void printWorkingDirectory();
 void getFile();
 void putFile();
 
