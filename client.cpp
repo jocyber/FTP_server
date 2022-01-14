@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#define PORT 2000
 #define BUFFSIZE 512
 using uint = unsigned int;
 
@@ -16,6 +15,13 @@ void errexit(const std::string message);
 
 int main(int argc, char **argv)
 {
+	if(argc != 3)
+		errexit("Format: ./client {server_domain_name} {port_number}\n");
+
+	//command-line argument information
+	//char *name = argv[1]; domain hasn't been implemented yet
+	uint port_num = atoi(argv[2]);
+
 	int sockfd;
 	std::string input;
 
@@ -26,21 +32,19 @@ int main(int argc, char **argv)
 	memset((struct sockaddr*) &addr, 0, sizeof(addr));
 
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(PORT);
-	addr.sin_addr.s_addr = INADDR_ANY;
+	addr.sin_port = htons(port_num);//network byte ordering of port number
+	addr.sin_addr.s_addr = INADDR_ANY;//IPv4 'wildcard'
 
 	char output[BUFFSIZE] = "";
 
 	if((connect(sockfd, (struct sockaddr*) &addr, sizeof(addr))) == -1)
 		errexit("Could not connect to the socket.");
 
-	bool running = true;
-
-	while(running) {
+	while(true) {
 		//empty the string
 		input.clear();
-		output[0] = 0;
-		std::cout << "/directory$ ";
+		output[0] = '\0';
+		std::cout << "myftp> ";
 
 		std::getline(std::cin, input);
 
@@ -48,15 +52,13 @@ int main(int argc, char **argv)
 		if(input.length() > BUFFSIZE)
 			std::cerr << "Buffer overflow.\n";
 		else {
-			std::cout << input.c_str() << '\n';
 			send(sockfd, input.c_str(), BUFFSIZE, 0);
 		
-			//print what the server responds with
 			if(recv(sockfd, output, BUFFSIZE, 0) == -1)
 				errexit("Failed to receive data from the server.");
 
-			if(strcmp(output, "exit") == 0)
-				running = false;
+			if(strcmp(output, "quit") == 0)
+				break;
 
 			std::cout << output << '\n';
 		}

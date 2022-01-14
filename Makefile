@@ -15,12 +15,6 @@ $(CLIENT): $(CLIENT).cpp
 clean:
 	rm $(SERVER) $(CLIENT)
 
-cli:
-	./$(CLIENT)
-
-ftp:
-	./$(SERVER)
-
 memleak:
 	valgrind --leak-check=full ./$(SERVER)
 

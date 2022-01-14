@@ -9,6 +9,7 @@
 using uint = unsigned int;
 #define PORT 2000
 #define BUFFSIZE 512
+#define IP "192.168.1.100"
 unsigned int numConnections = 0;
 
 void exitFailure(const std::string str) {
@@ -22,25 +23,25 @@ void* handleClient(void *socket);
 int main(int argc, char **argv) 
 {
 	int sockfd, client_sock;
-	char curr_direct[BUFFSIZE] = "./";
 
 	//AF_INET = IPv4
 	//SOCK_STREAM = TCP
 	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 			exitFailure("Failed to create a socket.");
 
-	//reset the structure
+	//initialize and set the structure to all zeros
 	struct sockaddr_in addr;
 	memset((struct sockaddr_in *) &addr, 0, sizeof(addr));
 
-	addr.sin_family = AF_INET;
+	addr.sin_family = AF_INET; // IPv4
 	addr.sin_port = htons(PORT);//host to network short/uint16(network byte ordering)
-	addr.sin_addr.s_addr = INADDR_ANY;//IPv4 'wildcard'
+	addr.sin_addr.s_addr = INADDR_ANY;
 
 	if(bind(sockfd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
 		exitFailure("Could not bind the socket to an address.");
 
 	//listen for oncoming connections
+	//SOMAXCONN = socket maximum connections
 	if(listen(sockfd, SOMAXCONN) == -1)
 		exitFailure("Could not set up a passive socket connection.");
 
@@ -48,6 +49,7 @@ int main(int argc, char **argv)
 	pthread_t tid;
 	
 	while(true) {
+		//accept oncoming connection
 		if((client_sock = accept(sockfd, NULL, NULL)) == -1)
 			exitFailure("Failed to accept client connection.");
 
@@ -61,6 +63,7 @@ int main(int argc, char **argv)
 		}
 
 		//create a thread and pass the handleClient function pointer and its parameter
+		//later, we should implement a thread pool for better performance
 		int	thStatus = pthread_create(&tid, NULL, handleClient, &client_sock);
 		numConnections++;
 
@@ -101,16 +104,18 @@ void* handleClient(void *socket) {
 				send(client_sock, message, BUFFSIZE, 0);//send an empty message to indicate success
 		}
 		else if(client_input.compare("pwd") == 0) { //print working directory
-				if((message = getcwd(message, PATH_MAX)) == NULL) {
+				char *result;
+
+				if((result = getcwd(message, BUFFSIZE)) == NULL) {
 					char response[] = "Path name too long.";
 					send(client_sock, response, BUFFSIZE, 0);
 				}
 				else {
-					send(client_sock, message, BUFFSIZE, 0);
+					send(client_sock, result, BUFFSIZE, 0);
 				}
 		}
-		else if(strcmp(buffer, "exit") == 0) {
-			strcpy(message, "exit");
+		else if(strcmp(buffer, "quit") == 0) {
+			strcpy(message, "quit");
 			send(client_sock, message, BUFFSIZE, 0);
 
 			//close the socket when the client has left the active session
@@ -127,7 +132,7 @@ void* handleClient(void *socket) {
 			send(client_sock, message, BUFFSIZE, 0);
 		}
 
-		//reset buffers
+		//reset buffers - O(1)
 		message[0] = '\0';
 		buffer[0] = '\0';
 	}
