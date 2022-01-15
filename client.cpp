@@ -7,11 +7,15 @@
 #include <string.h>
 #include <stdio.h>
 #include <string.h>
+#include <sstream>
+#include <fcntl.h>
+#include <fstream>
 
 #define BUFFSIZE 512
 using uint = unsigned int;
 
 void errexit(const std::string message);
+void handleGetFile(int sockfd, char output[], std::stringstream& ss, std::string inputSubstring);
 
 int main(int argc, char **argv)
 {
@@ -24,6 +28,7 @@ int main(int argc, char **argv)
 
 	int sockfd;
 	std::string input;
+	std::string inputSubstring;
 
 	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 		errexit("Failed to create a socket.");
@@ -48,11 +53,37 @@ int main(int argc, char **argv)
 
 		std::getline(std::cin, input);
 
+		// convert input into a stringstream to read word by word
+		std::stringstream ss;
+		ss << input;
+		ss >> inputSubstring;
+
+		// check if file already exists on local pc, prevent server from sending file over
+		if(inputSubstring.compare("get") == 0) {
+			ss >> inputSubstring;
+			inputSubstring = "copied_" + inputSubstring;  // used for testing on own computer to be able to duplicate file with another name, since always working in same directory
+			
+			std::ifstream file;
+			file.open(inputSubstring);
+			if(file.is_open()) {
+				std::cout << "File already exists.\n";
+				continue;
+			}
+			file.close();
+		}
+
 		//guard against buffer overflow
 		if(input.length() > BUFFSIZE)
 			std::cerr << "Buffer overflow.\n";
 		else {
+			// send command to server
 			send(sockfd, input.c_str(), BUFFSIZE, 0);
+
+			// handle getting file
+			if(input.substr(0,3) == "get") {
+				handleGetFile( sockfd, output, ss, inputSubstring);
+				continue;
+			}
 		
 			if(recv(sockfd, output, BUFFSIZE, 0) == -1)
 				errexit("Failed to receive data from the server.");
@@ -73,4 +104,46 @@ int main(int argc, char **argv)
 void errexit(const std::string message) {
 	std::cerr << message << '\n';
 	exit(EXIT_FAILURE);
+}
+
+void handleGetFile(int sockfd, char output[], std::stringstream& ss, std::string inputSubstring) {
+	// check to see if file was found on server
+	if(recv(sockfd, output, BUFFSIZE, 0) == -1)
+		errexit("Failed to receive data from the server.");
+				
+	if(strcmp(output, "file not found") == 0) {
+		std::cout << "File was not found.\n";
+		ss.clear();
+		return;
+	}
+
+	// get permission of file from server
+	struct stat fileStat;
+	if(recv(sockfd, &fileStat, sizeof(fileStat), 0) == -1)
+		errexit("Failed to receive data from the server.");
+
+	// create file
+	int file_fd = open(inputSubstring.c_str(), O_CREAT | O_APPEND | O_WRONLY, 0666 );
+	if( file_fd < 0) {
+		std::cout << "Error opening file.\n";
+		return;
+	}
+
+	// copy to file
+	int bitsLeft = fileStat.st_size;
+	int bitsRecieved;
+	while(bitsLeft > 0) {
+		memset(output, 0, BUFFSIZE);
+		if((bitsRecieved = recv(sockfd, output, BUFFSIZE, 0)) == -1)
+			errexit("Failed to receive data from the server.");
+		if(write(file_fd, output, sizeof(char) * bitsRecieved) != bitsRecieved) {
+			std::cout << "Write error to file.";
+			return;
+		}
+		bitsLeft -= bitsRecieved;
+		output[0] = '\0';
+	}
+
+	close(file_fd);
+	ss.clear();
 }

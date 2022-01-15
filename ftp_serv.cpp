@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <sstream>
 #include "myftp.h"
 
 using uint = unsigned int;
@@ -83,7 +84,13 @@ void* handleClient(void *socket) {
 		if((recv(client_sock, buffer, BUFFSIZE, 0)) == -1)
 			exitFailure("Failed to receive data from the client.");
 
-		std::string client_input(buffer);	
+		std::string client_input(buffer);
+
+		// convert input into a stringstream to read word by word
+		std::stringstream ss;
+		std::string client_input_substring;
+		ss << client_input;
+		ss >> client_input_substring;
 
 		//general logic for the ftp server starts here
 		//compare the client input to different options.
@@ -126,6 +133,11 @@ void* handleClient(void *socket) {
 				numConnections--;
 
 			pthread_exit(EXIT_SUCCESS);
+		}
+		else if(client_input_substring.compare("get") == 0) {
+			ss >> client_input_substring;
+			if(getFile(message, client_input_substring, client_sock, buffer) < 0)
+				continue;
 		}
 		else {
 			strcpy(message, "Input not recognized.");
