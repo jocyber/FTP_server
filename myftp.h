@@ -16,6 +16,6 @@
 
 void listDirectories(char message[]);
 int getFile(char message[], std::string filename, int client_sock, char buffer[]);
-void putFile();
+int putFile(char message[], std::string filename, int client_sock, char buffer[]);
 
 #endif

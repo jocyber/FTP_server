@@ -139,6 +139,11 @@ void* handleClient(void *socket) {
 			if(getFile(message, client_input_substring, client_sock, buffer) < 0)
 				continue;
 		}
+		else if(client_input_substring.compare("put") == 0) {
+			ss >> client_input_substring;
+			if(putFile(message, client_input_substring, client_sock, buffer) < 0)
+				continue;
+		}
 		else {
 			strcpy(message, "Input not recognized.");
 			send(client_sock, message, BUFFSIZE, 0);

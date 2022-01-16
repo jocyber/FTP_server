@@ -10,12 +10,15 @@
 #include <sstream>
 #include <fcntl.h>
 #include <fstream>
+#include <sys/stat.h>
+#include <sys/sendfile.h>
 
 #define BUFFSIZE 512
 using uint = unsigned int;
 
 void errexit(const std::string message);
-void handleGetFile(int sockfd, char output[], std::stringstream& ss, std::string inputSubstring);
+void handleGetFile(int sockfd, char output[], std::string inputSubstring);
+void handlePutFile(int sockfd, char output[], std::string inputSubstring);
 
 int main(int argc, char **argv)
 {
@@ -57,6 +60,7 @@ int main(int argc, char **argv)
 		std::stringstream ss;
 		ss << input;
 		ss >> inputSubstring;
+		
 
 		// check if file already exists on local pc, prevent server from sending file over
 		if(inputSubstring.compare("get") == 0) {
@@ -71,6 +75,18 @@ int main(int argc, char **argv)
 			}
 			file.close();
 		}
+		// check to make sure file exists on computer
+		if(inputSubstring.compare("put") == 0) {
+			ss >> inputSubstring;
+			
+			std::ifstream file;
+			file.open(inputSubstring);
+			if(!file.is_open()) {
+				std::cout << "File does not exist.\n";
+				continue;
+			}
+			file.close();
+		}
 
 		//guard against buffer overflow
 		if(input.length() > BUFFSIZE)
@@ -81,7 +97,15 @@ int main(int argc, char **argv)
 
 			// handle getting file
 			if(input.substr(0,3) == "get") {
-				handleGetFile( sockfd, output, ss, inputSubstring);
+				handleGetFile( sockfd, output, inputSubstring);
+				ss.clear();
+				continue;
+			}
+
+			// handle puting file
+			if(input.substr(0,3) == "put") {
+				handlePutFile( sockfd, output, inputSubstring);
+				ss.clear();
 				continue;
 			}
 		
@@ -106,14 +130,13 @@ void errexit(const std::string message) {
 	exit(EXIT_FAILURE);
 }
 
-void handleGetFile(int sockfd, char output[], std::stringstream& ss, std::string inputSubstring) {
+void handleGetFile(int sockfd, char output[], std::string inputSubstring) {
 	// check to see if file was found on server
 	if(recv(sockfd, output, BUFFSIZE, 0) == -1)
 		errexit("Failed to receive data from the server.");
 				
 	if(strcmp(output, "file not found") == 0) {
 		std::cout << "File was not found.\n";
-		ss.clear();
 		return;
 	}
 
@@ -145,5 +168,28 @@ void handleGetFile(int sockfd, char output[], std::stringstream& ss, std::string
 	}
 
 	close(file_fd);
-	ss.clear();
+}
+
+void handlePutFile(int sockfd, char output[], std::string inputSubstring) {
+	// check to see if file was not already created on the server
+	if(recv(sockfd, output, BUFFSIZE, 0) == -1)
+		errexit("Failed to receive data from the server.");
+				
+	if(strcmp(output, "file exists") == 0) {
+		std::cout << "File already exists on server.\n";
+		return;
+	}
+
+	// open file
+	int file_fd = open(inputSubstring.c_str(), O_RDONLY );
+	if(file_fd < 0) {
+		std::cout << "Error opening file.\n";
+		return;
+	}
+
+	// send file, and permissions
+	struct stat fileStat;
+	fstat(file_fd, &fileStat);
+	send(sockfd, &fileStat, sizeof(fileStat), 0);
+	sendfile(sockfd, file_fd, 0, fileStat.st_size);
 }
