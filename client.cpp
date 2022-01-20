@@ -62,20 +62,20 @@ int main(int argc, char **argv)
 		ss >> inputSubstring;
 		
 
-		// check if file already exists on local pc, prevent server from sending file over
+		// check if file already exists on local pc, prevent server from sending file over to overwrite
 		if(inputSubstring.compare("get") == 0) {
-			ss >> inputSubstring;
+			ss >> inputSubstring; // get file name
 			inputSubstring = "copied_" + inputSubstring;  // used for testing on own computer to be able to duplicate file with another name, since always working in same directory
 			
 			std::ifstream file;
 			file.open(inputSubstring);
 			if(file.is_open()) {
 				std::cout << "File already exists.\n";
+				file.close();
 				continue;
 			}
-			file.close();
 		}
-		// check to make sure file exists on computer
+		// check to make sure file exists on computer to send to server
 		if(inputSubstring.compare("put") == 0) {
 			ss >> inputSubstring;
 			
@@ -83,9 +83,9 @@ int main(int argc, char **argv)
 			file.open(inputSubstring);
 			if(!file.is_open()) {
 				std::cout << "File does not exist.\n";
+				file.close();
 				continue;
 			}
-			file.close();
 		}
 
 		//guard against buffer overflow
@@ -134,7 +134,7 @@ void handleGetFile(int sockfd, char output[], std::string inputSubstring) {
 	// check to see if file was found on server
 	if(recv(sockfd, output, BUFFSIZE, 0) == -1)
 		errexit("Failed to receive data from the server.");
-				
+	// if file was not on the server, return			
 	if(strcmp(output, "file not found") == 0) {
 		std::cout << "File was not found.\n";
 		return;
@@ -167,6 +167,7 @@ void handleGetFile(int sockfd, char output[], std::string inputSubstring) {
 		output[0] = '\0';
 	}
 
+	// close file
 	close(file_fd);
 }
 
@@ -174,7 +175,7 @@ void handlePutFile(int sockfd, char output[], std::string inputSubstring) {
 	// check to see if file was not already created on the server
 	if(recv(sockfd, output, BUFFSIZE, 0) == -1)
 		errexit("Failed to receive data from the server.");
-				
+	// if the file name already existed on the server, return, don't want to rewrite it			
 	if(strcmp(output, "file exists") == 0) {
 		std::cout << "File already exists on server.\n";
 		return;
@@ -187,9 +188,12 @@ void handlePutFile(int sockfd, char output[], std::string inputSubstring) {
 		return;
 	}
 
-	// send file, and permissions
+	// send file, and metadata
 	struct stat fileStat;
 	fstat(file_fd, &fileStat);
 	send(sockfd, &fileStat, sizeof(fileStat), 0);
 	sendfile(sockfd, file_fd, 0, fileStat.st_size);
+
+	// close file
+	close(file_fd);
 }

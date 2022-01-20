@@ -18,16 +18,13 @@ void listDirectories(char message[]) {
 }
 
 // send the file to the client
-int getFile(char message[], std::string filename, int client_sock, char buffer[]) {
+void getFile(char message[], std::string filename, int client_sock, char buffer[]) {
 	// open file, if error return "file not found"
 	int file_fd = open(filename.c_str(), O_RDONLY);
 	if(file_fd < 0) {
 		std::string error = "file not found";
 		send(client_sock, error.c_str(), BUFFSIZE, 0); 
-		//reset buffers - O(1)
-		message[0] = '\0';
-		buffer[0] = '\0';
-		return -1;
+		return;
 	}
 	send(client_sock, "file found", BUFFSIZE, 0); 
 
@@ -39,34 +36,35 @@ int getFile(char message[], std::string filename, int client_sock, char buffer[]
 
 	// close file
 	close(file_fd);
-	return 0;
 }
 
-int putFile(char message[], std::string filename, int client_sock, char buffer[]) {
+void putFile(char message[], std::string filename, int client_sock, char buffer[]) {
 	// check if file already exits, if it does return "file found"
-	filename = "copied_" + filename;  // used for local testing where files are the same
+	filename = "copied_" + filename;  // used for local testing where files are the same, testing in same directory
 	int file_fd = open(filename.c_str(), O_RDONLY );
 	if( file_fd > 0) {
 		std::string error = "file exists";
 		send(client_sock, error.c_str(), BUFFSIZE, 0); 
 		close(file_fd);
-		return -1;
+		return;
 	}
 	send(client_sock, "file not found", BUFFSIZE, 0);
 
-	// copy from client to file
+	// copy file metadata from client
 	struct stat fileStat;
 	if(recv(client_sock, &fileStat, sizeof(fileStat), 0) == -1) {
 		std::cout << "Error recieving from client";
 		exit(EXIT_FAILURE);
 	}
 
+	// create the file on server
 	file_fd = open(filename.c_str(), O_CREAT | O_APPEND | O_WRONLY, 0666 );
 	if( file_fd < 0) {
 		std::cout << "Error opening file.\n";
 		exit(EXIT_FAILURE);
 	}
 
+	// copy file to server file
 	int bitsLeft = fileStat.st_size;
 	int bitsRecieved;
 	char output[BUFFSIZE];
@@ -84,7 +82,6 @@ int putFile(char message[], std::string filename, int client_sock, char buffer[]
 		output[0] = '\0';
 	}
 
+	// close file
 	close(file_fd);
-
-	return 1;
 }

@@ -15,7 +15,7 @@
 #define BUFFSIZE 512
 
 void listDirectories(char message[]);
-int getFile(char message[], std::string filename, int client_sock, char buffer[]);
-int putFile(char message[], std::string filename, int client_sock, char buffer[]);
+void getFile(char message[], std::string filename, int client_sock, char buffer[]);
+void putFile(char message[], std::string filename, int client_sock, char buffer[]);
 
 #endif

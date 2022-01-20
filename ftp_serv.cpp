@@ -90,7 +90,7 @@ void* handleClient(void *socket) {
 		std::stringstream ss;
 		std::string client_input_substring;
 		ss << client_input;
-		ss >> client_input_substring;
+		ss >> client_input_substring; // first word from client input
 
 		//general logic for the ftp server starts here
 		//compare the client input to different options.
@@ -135,14 +135,12 @@ void* handleClient(void *socket) {
 			pthread_exit(EXIT_SUCCESS);
 		}
 		else if(client_input_substring.compare("get") == 0) {
-			ss >> client_input_substring;
-			if(getFile(message, client_input_substring, client_sock, buffer) < 0)
-				continue;
+			ss >> client_input_substring; // get the file name
+			getFile(message, client_input_substring, client_sock, buffer);
 		}
 		else if(client_input_substring.compare("put") == 0) {
-			ss >> client_input_substring;
-			if(putFile(message, client_input_substring, client_sock, buffer) < 0)
-				continue;
+			ss >> client_input_substring; // get the file name
+			putFile(message, client_input_substring, client_sock, buffer);
 		}
 		else {
 			strcpy(message, "Input not recognized.");
