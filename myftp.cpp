@@ -27,12 +27,12 @@ ssize_t getFile(const std::string &file, const int &client_sock) {
 
 	struct stat sb;
 	stat(file.c_str(), &sb);
-	int optval = 1;
+	send(client_sock, &sb, sizeof(sb), 0);
 
+	int optval = 1;
 	//enable tcp_cork (only send a packet when it's full, meaning network congestion is reduced)
 	setsockopt(client_sock, IPPROTO_TCP, TCP_CORK, &optval, sizeof(optval));
 	sendfile(client_sock, fd, 0, sb.st_size);
-
 	//disable tcp_cork
 	optval = 0;
 	setsockopt(client_sock, IPPROTO_TCP, TCP_CORK, &optval, sizeof(optval));

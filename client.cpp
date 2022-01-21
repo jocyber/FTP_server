@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 
 #define BUFFSIZE 512
 using uint = unsigned int;
@@ -83,9 +84,7 @@ void errexit(const std::string message) {
 	exit(EXIT_FAILURE);
 }
 
-void handleGetCommand(const int &sockfd, const std::string &input, char buffer[]) {
-	ssize_t numRead = recv(sockfd, buffer, BUFFSIZE, 0);
-
+void handleGetCommand(const int &sockfd, const std::string &input, char output[]) {
 	std::string file = input.substr(4, input.length());
 
 	int fd = open(file.c_str(), O_WRONLY | O_CREAT, 0666);
@@ -94,12 +93,29 @@ void handleGetCommand(const int &sockfd, const std::string &input, char buffer[]
 		return;
 	}
 
-	ssize_t out;
-	if((out = write(fd, buffer, numRead)) != numRead) {
-		std::cerr << "Error occured when writing to file.\n";
-		return;
+	// get permission of file from server
+	struct stat fileStat;
+	if(recv(sockfd, &fileStat, sizeof(fileStat), 0) == -1)
+		errexit("Failed to receive data from the server.");
+	
+	//keep reciving data until there's none left
+	int bytesLeft = fileStat.st_size;
+	int bytesRecieved;
+
+	while(bytesLeft > 0) {
+		memset(output, 0, BUFFSIZE);
+
+		if((bytesRecieved = recv(sockfd, output, BUFFSIZE, 0)) == -1)
+			errexit("Failed to receive data from the server.");
+		if(write(fd, output, bytesRecieved) != bytesRecieved) {
+			std::cerr << "Write error to file.";
+			return;
+		}
+
+		bytesLeft -= bytesRecieved;
 	}
 
+	// close file
 	if(close(fd) == -1)
 		std::cerr << "Error in closing the file.\n";
 }
