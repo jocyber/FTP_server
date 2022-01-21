@@ -1,4 +1,4 @@
-FLAGS := -Wall -pedantic-errors -O2 -pthread
+FLAGS := -std=c++17 -Wall -pedantic-errors -O2 -pthread
 EXE := ftp_serv
 HEADER := myftp
 CLIENT := client

@@ -4,6 +4,8 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <dirent.h>
 #include "myftp.h"
 
 using uint = unsigned int;
@@ -126,6 +128,26 @@ void* handleClient(void *socket) {
 				numConnections--;
 
 			pthread_exit(EXIT_SUCCESS);
+		}
+		else if(client_input.substr(0, 6).compare("delete") == 0) {
+			std::string file = client_input.substr(7, client_input.length());
+
+			if(remove(const_cast<char*>(file.c_str())) == -1) {
+			 	file = "File: {" + file + "} does not exist.\n";
+				send(client_sock, file.c_str(), file.length(), 0);
+			}
+			else
+				send(client_sock, message, BUFFSIZE, 0);
+		}
+		else if(client_input.substr(0, 5).compare("mkdir") == 0) {
+			std::string directory = client_input.substr(6, client_input.length());
+
+			if(mkdir(const_cast<char*>(directory.c_str()), S_IRUSR | S_IWUSR) == -1) {
+				directory = "Directory {" + directory + "} already exists.\n";
+				send(client_sock, directory.c_str(), directory.length(), 0);
+			}
+			else
+				send(client_sock, message, BUFFSIZE, 0);
 		}
 		else {
 			strcpy(message, "Input not recognized.");
