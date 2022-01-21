@@ -142,12 +142,22 @@ void* handleClient(void *socket) {
 		else if(client_input.substr(0, 5).compare("mkdir") == 0) {
 			std::string directory = client_input.substr(6, client_input.length());
 
+			//make directory with read and write permissions
 			if(mkdir(const_cast<char*>(directory.c_str()), S_IRUSR | S_IWUSR) == -1) {
 				directory = "Directory {" + directory + "} already exists.\n";
 				send(client_sock, directory.c_str(), directory.length(), 0);
 			}
 			else
 				send(client_sock, message, BUFFSIZE, 0);
+		}
+		else if(client_input.substr(0,3).compare("get") == 0) {
+			//endline to make parsing the packet easier
+			const std::string file = client_input.substr(4, client_input.length());
+
+			if(getFile(file, client_sock) == -1) {
+				std::string error = "Failed to send the requested file.\n";
+				send(client_sock, error.c_str(), error.length(), 0);
+			}
 		}
 		else {
 			strcpy(message, "Input not recognized.");

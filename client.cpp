@@ -7,11 +7,13 @@
 #include <string.h>
 #include <stdio.h>
 #include <string.h>
+#include <fcntl.h>
 
 #define BUFFSIZE 512
 using uint = unsigned int;
 
 void errexit(const std::string message);
+void handleGetCommand(const int &sockfd, const std::string &input, char buffer[]);
 
 int main(int argc, char **argv)
 {
@@ -53,14 +55,20 @@ int main(int argc, char **argv)
 			std::cerr << "Buffer overflow.\n";
 		else {
 			send(sockfd, input.c_str(), BUFFSIZE, 0);
-		
-			if(recv(sockfd, output, BUFFSIZE, 0) == -1)
-				errexit("Failed to receive data from the server.");
 
-			if(strcmp(output, "quit") == 0)
-				break;
+			//if input is 'get': while recv != -1, output to file
+			if(input.substr(0,3).compare("get") == 0) {
+				handleGetCommand(sockfd, input, output);
+			}
+			else {
+				if(recv(sockfd, output, BUFFSIZE, 0) == -1)
+					errexit("Failed to receive data from the server.");
 
-			std::cout << output << '\n';
+				if(strcmp(output, "quit") == 0)
+					break;
+
+				std::cout << output << '\n';
+			}
 		}
 	}
 
@@ -73,4 +81,25 @@ int main(int argc, char **argv)
 void errexit(const std::string message) {
 	std::cerr << message << '\n';
 	exit(EXIT_FAILURE);
+}
+
+void handleGetCommand(const int &sockfd, const std::string &input, char buffer[]) {
+	ssize_t numRead = recv(sockfd, buffer, BUFFSIZE, 0);
+
+	std::string file = input.substr(4, input.length());
+
+	int fd = open(file.c_str(), O_WRONLY | O_CREAT, 0666);
+	if(fd == -1) {
+		std::cerr << "Could not create the requested file.\n";
+		return;
+	}
+
+	ssize_t out;
+	if((out = write(fd, buffer, numRead)) != numRead) {
+		std::cerr << "Error occured when writing to file.\n";
+		return;
+	}
+
+	if(close(fd) == -1)
+		std::cerr << "Error in closing the file.\n";
 }
