@@ -13,7 +13,9 @@
 #define BUFFSIZE 512
 using uint = unsigned int;
 
+//terminates program if error
 void errexit(const std::string message);
+//pulls file from server
 void handleGetCommand(const int &sockfd, const std::string &input, char buffer[]);
 
 int main(int argc, char **argv)
@@ -79,11 +81,13 @@ int main(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+//terminates program if error
 void errexit(const std::string message) {
 	std::cerr << message << '\n';
 	exit(EXIT_FAILURE);
 }
 
+//pulls file from server
 void handleGetCommand(const int &sockfd, const std::string &input, char output[]) {
 	std::string file = input.substr(4, input.length());
 

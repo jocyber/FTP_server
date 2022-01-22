@@ -4,16 +4,20 @@
 
 //read the current directory
 void listDirectories(char message[]) {
-	char path[] = "./";
+	//local variables
+  char path[] = "./";
 	char space[] = " ";
 
+  //pointer reference
 	DIR *direct = opendir(path);
 	struct dirent *dirP;	
 
+  //while statement
 	while((dirP = readdir(direct)) != NULL) {
 		if(strcmp(dirP->d_name, ".") == 0 || strcmp(dirP->d_name, "..") == 0)
 			continue;
-
+      
+    //returns pointer
 		strcat(message, dirP->d_name);
 		strcat(message, space);
 	}
@@ -21,10 +25,13 @@ void listDirectories(char message[]) {
 
 //send file to the client
 ssize_t getFile(const std::string &file, const int &client_sock) {
-	int fd;
+	//local variable
+  int fd;
+  //opens tile
 	if((fd = open(file.c_str(), O_RDONLY)) == -1)
 			return -1;
 
+  //retrieves and sends file
 	struct stat sb;
 	stat(file.c_str(), &sb);
 	send(client_sock, &sb, sizeof(sb), 0);
@@ -37,6 +44,7 @@ ssize_t getFile(const std::string &file, const int &client_sock) {
 	optval = 0;
 	setsockopt(client_sock, IPPROTO_TCP, TCP_CORK, &optval, sizeof(optval));
 	
+ //closes file
 	if(close(fd) == -1)
 		return -1;
 

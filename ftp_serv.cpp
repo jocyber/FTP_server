@@ -8,12 +8,14 @@
 #include <dirent.h>
 #include "myftp.h"
 
+//defines ip address and port number of server
 using uint = unsigned int;
 #define PORT 2000
 #define BUFFSIZE 512
 #define IP "192.168.1.100"
 unsigned int numConnections = 0;
 
+//terminates program
 void exitFailure(const std::string str) {
 	std::cout << str << '\n';
 	exit(EXIT_FAILURE);
