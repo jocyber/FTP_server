@@ -14,7 +14,7 @@
 using uint = unsigned int;
 
 void errexit(const std::string message);
-void handleGetCommand(const int &sockfd, const std::string &file, char buffer[], int &fd);
+void handleGetCommand(const int &sockfd, const std::string &file, char buffer[]);
 
 int main(int argc, char **argv)
 {
@@ -55,22 +55,20 @@ int main(int argc, char **argv)
 		if(input.length() > BUFFSIZE)
 			std::cerr << "Buffer overflow.\n";
 		else {
-			send(sockfd, input.c_str(), BUFFSIZE, 0);
-			//if input is 'get': while recv != -1, output to file
 			if(input.substr(0,3).compare("get") == 0) {
 				//check for files existence
 				std::string file = input.substr(4, input.length());
-				int fd = open(file.c_str(), O_WRONLY | O_CREAT, 0666);
 
-				if(fd == -1)
-					std::cerr << "Failed to open file or already exists.\n";
-				else
-					handleGetCommand(sockfd, input, output, fd);
-
-				if(close(fd) == -1)
-					std::cerr << "Failed to close the file.\n";
+				if(access(file.c_str(), F_OK) == 0)
+					std::cerr << "File already exists in the current directory.\n";
+				else {
+					send(sockfd, input.c_str(), BUFFSIZE, 0);
+					handleGetCommand(sockfd, file, output);
+				}
 			}
 			else {
+				send(sockfd, input.c_str(), BUFFSIZE, 0);
+
 				if(recv(sockfd, output, BUFFSIZE, 0) == -1)
 					errexit("Failed to receive data from the server.");
 
@@ -93,7 +91,12 @@ void errexit(const std::string message) {
 	exit(EXIT_FAILURE);
 }
 
-void handleGetCommand(const int &sockfd, const std::string &file, char output[], int &fd) {
+void handleGetCommand(const int &sockfd, const std::string &file, char output[]) {
+	int fd = open(file.c_str(), O_WRONLY | O_CREAT, 0666);
+
+	if(fd == -1)
+		std::cerr << "Failed to open file or already exists.\n";
+
 	// get permission of file from server
 	struct stat fileStat;
 	if(recv(sockfd, &fileStat, sizeof(fileStat), 0) == -1)
@@ -115,4 +118,7 @@ void handleGetCommand(const int &sockfd, const std::string &file, char output[],
 
 		bytesLeft -= bytesRecieved;
 	}
+
+	if(close(fd) == -1)
+		std::cerr << "Failed to close the file.\n";
 }
