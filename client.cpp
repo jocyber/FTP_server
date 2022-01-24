@@ -9,12 +9,15 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <netinet/tcp.h>
+#include <sys/sendfile.h>
 
 #define BUFFSIZE 512
 using uint = unsigned int;
 
 void errexit(const std::string message);
 void handleGetCommand(const int &sockfd, const std::string &file, char buffer[]);
+void handlePutCommand(const int &sockfd, const std::string &file);
 
 int main(int argc, char **argv)
 {
@@ -66,6 +69,12 @@ int main(int argc, char **argv)
 					handleGetCommand(sockfd, file, output);
 				}
 			}
+			else if(input.substr(0,3).compare("put") == 0) {
+				//send the file name
+				send(sockfd, input.c_str(), BUFFSIZE, 0);
+				//send size and contents
+				handlePutCommand(sockfd, input.substr(4, input.length()));
+			}
 			else {
 				send(sockfd, input.c_str(), BUFFSIZE, 0);
 
@@ -91,6 +100,7 @@ void errexit(const std::string message) {
 	exit(EXIT_FAILURE);
 }
 
+//download file from server
 void handleGetCommand(const int &sockfd, const std::string &file, char output[]) {
 	int fd = open(file.c_str(), O_WRONLY | O_CREAT, 0666);
 
@@ -122,3 +132,31 @@ void handleGetCommand(const int &sockfd, const std::string &file, char output[])
 	if(close(fd) == -1)
 		std::cerr << "Failed to close the file.\n";
 }
+
+//upload file to server
+void handlePutCommand(const int &sockfd, const std::string &file) {
+	int fd;
+	if((fd = open(file.c_str(), O_RDONLY)) == -1)
+			errexit("Failed to open file.\n");
+
+	struct stat sb;
+	fstat(fd, &sb);
+
+	//send file size first
+	if(send(sockfd, &sb, sizeof(sb), 0) == -1)
+		errexit("Failed to send file's metadata.");
+
+	int optval = 1;
+	//enable tcp_cork (only send a packet when it's full, meaning network congestion is reduced)
+	if(setsockopt(sockfd, IPPROTO_TCP, TCP_CORK, &optval, sizeof(optval)))
+		errexit("Failed to enable TCP_CORK.");
+
+	if(sendfile(sockfd, fd, 0, sb.st_size) == -1)
+		errexit("Failed to send file's contents.");
+
+	//disable tcp_cork
+	optval = 0;
+	if(setsockopt(sockfd, IPPROTO_TCP, TCP_CORK, &optval, sizeof(optval)) == -1)
+		errexit("Failed to disable TCP_CORK.");
+}
+
