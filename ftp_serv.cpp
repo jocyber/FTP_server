@@ -126,7 +126,7 @@ void* handleClient(void *socket) {
 					//change the directory
 					if(chdir(client_input.c_str()) == -1) {
 						std::string error;
-						error = "No directory named {" + client_input + "}\n";
+						error = "No directory named {" + client_input + "}";
 
 						if(send(client_sock, error.c_str(), BUFFSIZE, 0) == -1)
 						 throw "Failed to send error message for 'cd' to client.\n";	

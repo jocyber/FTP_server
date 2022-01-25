@@ -25,7 +25,7 @@ void listDirectories(char message[]) {
 void getFile(const std::string &file, const int &client_sock) {
 	int fd;
 	if((fd = open(file.c_str(), O_RDONLY)) == -1)
-			throw "Failed to open file.\n";
+		throw "Failed to open file.\n";
 
 	struct stat sb;
 	stat(file.c_str(), &sb);
@@ -52,8 +52,8 @@ void putFile(const std::string &filename, const int &client_sock) {
 	int fd = open(filename.c_str(), O_WRONLY | O_CREAT, 0666);
 	char output[BUFFSIZE];
 
-	if(fd == -1)
-		throw "Failed to open file.\n";
+	if(fd == -1) 
+		std::cout << "Failed to open file.\n";
 
 	// get permission of file from server
 	struct stat fileStat;
