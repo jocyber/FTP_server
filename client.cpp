@@ -66,6 +66,14 @@ int main(int argc, char **argv)
 					std::cerr << "File already exists in the current directory.\n";
 				else {
 					send(sockfd, input.c_str(), BUFFSIZE, 0);
+					// check if file exists on server
+					char fileMessage[100];
+					if(recv(sockfd, fileMessage, sizeof(fileMessage), 0) == -1)
+						errexit("Failed to receive data from the server.");
+					if(strcmp(fileMessage, "file exists") != 0) {
+						std::cerr << fileMessage;
+						continue;
+					}
 					handleGetCommand(sockfd, file, output);
 				}
 			}

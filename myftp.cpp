@@ -24,8 +24,18 @@ void listDirectories(char message[]) {
 //send file to the client
 void getFile(const std::string &file, const int &client_sock) {
 	int fd;
-	if((fd = open(file.c_str(), O_RDONLY)) == -1)
-		throw "Failed to open file.\n";
+	// check if file exists on the server
+	if((fd = open(file.c_str(), O_RDONLY)) == -1) {
+		std::string errorMsg = "File {" + file + "} does not exist.\n";
+		if(send(client_sock, errorMsg.c_str(), sizeof(errorMsg), 0) == -1) {
+			throw "Failed to send error msg to client.\n";
+		}
+		return;
+	}
+	std::string sucessMsg = "file exists";
+	if(send(client_sock, sucessMsg.c_str(), sizeof(sucessMsg), 0) == -1) {
+			throw "Failed to send error msg to client.\n";
+	}
 
 	struct stat sb;
 	stat(file.c_str(), &sb);
