@@ -9,12 +9,17 @@
 #include <stdlib.h>
 #include "myftp.h"
 
-using uint = unsigned int;
 #define PORT 2000
 #define BUFFSIZE 512
 #define IP "192.168.1.100"
 unsigned int numConnections = 0;
 
+//map the strings to codes so the strings will work with a switch statement
+std::unordered_map<std::string, int> code = {
+	{"quit", 1}, {"get", 2}, {"put", 3}, {"delete", 4}, {"ls", 5}, 
+	{"pwd", 6}, {"cd", 7}, {"mkdir", 8} };
+
+//exit the program on critical error
 void exitFailure(const std::string str) {
 	std::cout << str << '\n';
 	exit(EXIT_FAILURE);
@@ -89,33 +94,51 @@ void* handleClient(void *socket) {
 			if((recv(client_sock, buffer, BUFFSIZE, 0)) == -1)
 				throw "Failed to receive data from the client.";
 
-			std::string client_input(buffer);	
+			std::string command, client_input(buffer);
+			unsigned int i = 0;
+
+			//extract command
+			for(; buffer[i] != ' ' && i < client_input.length(); ++i)
+				command += client_input[i];
+	
+			//client_input now becomes the argument
+			if(command.length() != client_input.length())
+				client_input = client_input.substr(i + 1, client_input.length());	
+
+			int option;
+			if(code.find(command) == code.end())// if command is not valid
+				option = -1;
+			else
+				option = code[command];
 
 			//general logic for the ftp server starts here
 			//compare the client input to different options.
-			if(client_input.compare("ls") == 0) {
-				listDirectories(message);
+			switch(option) {
+				case 5: // ls
+					listDirectories(message);
 
-				if(send(client_sock, message, BUFFSIZE, 0) == -1)
-					throw "Failed to send 'ls' message to client.\n";
-			}
-			else if(client_input.substr(0, 2).compare("cd") == 0) {
-				//buffer without cd
-				std::string path = client_input.substr(3, client_input.length());	
+					if(send(client_sock, message, BUFFSIZE, 0) == -1)
+						throw "Failed to send 'ls' message to client.\n";
 
-				//change the directory
-				if(chdir(path.c_str()) == -1) {
-					std::string error = "No directory named {" + path + "}\n";
+					break;
 
-					if(send(client_sock, error.c_str(), BUFFSIZE, 0) == -1)
-					 throw "Failed to send error message for 'cd' to client.\n";	
-				}
-				else {
-					if(send(client_sock, message, BUFFSIZE, 0) == -1) //send an empty message to indicate success
-						throw "Failed to send success message to client from 'cd'.\n";
-				}
-			}
-			else if(client_input.compare("pwd") == 0) { //print working directory
+				case 7: // cd
+					//change the directory
+					if(chdir(client_input.c_str()) == -1) {
+						std::string error;
+						error = "No directory named {" + client_input + "}\n";
+
+						if(send(client_sock, error.c_str(), BUFFSIZE, 0) == -1)
+						 throw "Failed to send error message for 'cd' to client.\n";	
+					}
+					else {
+						if(send(client_sock, message, BUFFSIZE, 0) == -1) //send an empty message to indicate success
+							throw "Failed to send success message to client from 'cd'.\n";
+					}
+
+					break;
+
+				case 6: //pwd
 					char *result;
 
 					if((result = getcwd(message, BUFFSIZE)) == NULL) {
@@ -127,71 +150,74 @@ void* handleClient(void *socket) {
 						if(send(client_sock, result, BUFFSIZE, 0) == -1)
 							throw "Failed to send 'pwd' response to client.\n";
 					}
-			}
-			else if(strcmp(buffer, "quit") == 0) {
-				strcpy(message, "quit");
-				
-				if(send(client_sock, message, BUFFSIZE, 0) == -1)
-					throw Network_Error("Failed to send 'quit' message to client.\n");
 
-				//close the socket when the client has left the active session
-				if(close(client_sock) == -1)
-					throw Network_Error("Could not close the active socket connection.\n");
+					break;
 
-				if(numConnections > 0)
-					numConnections--;
-
-				stop = true; // set flag to true and end ftp session
-			}
-			else if(client_input.substr(0, 6).compare("delete") == 0) {
-				std::string file = client_input.substr(7, client_input.length());
-
-				//remove file or empty directory
-				if(remove(const_cast<char*>(file.c_str())) == -1) {
-					file = "File: {" + file + "} does not exist.\n";
-					if(send(client_sock, file.c_str(), file.length(), 0) == -1)
-						throw "Failed to send error message for 'delete'.\n";
-				}
-				else
+				case 1://quit
+					strcpy(message, "quit");
+					
 					if(send(client_sock, message, BUFFSIZE, 0) == -1)
-						throw "Failed to send 'delete' response to client.\n";
-			}
-			else if(client_input.substr(0, 5).compare("mkdir") == 0) {
-				std::string directory = client_input.substr(6, client_input.length());
+						throw Network_Error("Failed to send 'quit' message to client.\n");
 
-				//make directory with read and write permissions
-				if(mkdir(const_cast<char*>(directory.c_str()), S_IRUSR | S_IWUSR) == -1) {
-					directory = "Directory {" + directory + "} already exists.\n";
+					//close the socket when the client has left the active session
+					if(close(client_sock) == -1)
+						throw Network_Error("Could not close the active socket connection.\n");
 
-					if(send(client_sock, directory.c_str(), directory.length(), 0) == -1)
-						throw "Failed to send 'mkdir' error message.\n";
-				}
-				else
-					if(send(client_sock, message, BUFFSIZE, 0) == -1) // send empty string to indicate success
-						throw "Failed to send 'mkdir' response to client.\n";
-			}
-			else if(client_input.substr(0,3).compare("get") == 0) {
-				//endline to make parsing the packet easier
-				const std::string file = client_input.substr(4, client_input.length());
-				getFile(file, client_sock); // upload file to client
-			}
-			else if(client_input.substr(0,3).compare("put") == 0) {
-				const std::string file = client_input.substr(4, client_input.length());
+					if(numConnections > 0)
+						numConnections--;
 
-				//check if file already exists
-				if(access(file.c_str(), F_OK) == 0) {
-					const std::string exists = "File {" + file + "} already exists.";
+					stop = true; // set flag to true and end ftp session
+					break;
 
-					if(send(client_sock, exists.c_str(), exists.length(), 0) == -1)
-						throw "File already exists in the current directory.\n";
-				}
-				else
-					putFile(client_input.substr(4, client_input.length()), client_sock);//download file from client
-			}
-			else {
-				strcpy(message, "Input not recognized.");
-				if(send(client_sock, message, BUFFSIZE, 0) == -1)
-					throw "Failed to send 'input not recognized' to client.\n";
+				case 4: // delete
+					//remove file or empty directory
+					if(remove(const_cast<char*>(client_input.c_str())) == -1) {
+						client_input = "File: {" + client_input + "} does not exist.\n";
+						if(send(client_sock, client_input.c_str(), client_input.length(), 0) == -1)
+							throw "Failed to send error message for 'delete'.\n";
+					}
+					else
+						if(send(client_sock, message, BUFFSIZE, 0) == -1)
+							throw "Failed to send 'delete' response to client.\n";
+
+					break;
+
+				case 8://mkdir
+					//make directory with read and write permissions
+					if(mkdir(const_cast<char*>(client_input.c_str()), S_IRUSR | S_IWUSR) == -1) {
+						client_input = "Directory {" + client_input + "} already exists.\n";
+
+						if(send(client_sock, client_input.c_str(), client_input.length(), 0) == -1)
+							throw "Failed to send 'mkdir' error message.\n";
+					}
+					else
+						if(send(client_sock, message, BUFFSIZE, 0) == -1) // send empty string to indicate success
+							throw "Failed to send 'mkdir' response to client.\n";
+
+					break;
+
+				case 2://get
+					//endline to make parsing the packet easier
+					getFile(client_input, client_sock); // upload file to client
+					break;
+
+				case 3://put
+					//check if file already exists
+					if(access(client_input.c_str(), F_OK) == 0) {
+						const std::string exists = "File {" + client_input + "} already exists.";
+
+						if(send(client_sock, exists.c_str(), exists.length(), 0) == -1)
+							throw "File already exists in the current directory.\n";
+					}
+					else
+						putFile(client_input, client_sock);//download file from client
+						
+					break;
+
+				default:
+					strcpy(message, "Input not recognized.");
+					if(send(client_sock, message, BUFFSIZE, 0) == -1)
+						throw "Failed to send 'input not recognized' to client.\n";
 			}
 		}
 		catch(char *message) {

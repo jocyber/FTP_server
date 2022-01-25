@@ -10,6 +10,7 @@
 #include <sys/sendfile.h>
 #include <fcntl.h>
 #include <exception>
+#include <unordered_map>
 
 #define BUFFSIZE 512
 
