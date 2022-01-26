@@ -9,14 +9,26 @@
 #include <sys/stat.h>
 #include <sys/sendfile.h>
 #include <fcntl.h>
+#include <exception>
+#include <unordered_map>
 
 #define BUFFSIZE 512
 
-//reads the current directory
+//custom exception for network errors
+class Network_Error : std::exception {
+	const char *message;
+
+public:
+	Network_Error(const char* _message) : message(_message) {}
+
+	//override virtual 'what()' member function
+	const char* what() const throw() {
+		return message;
+	}
+};
+
 void listDirectories(char message[]);
-//pulls the file from the server to the client
-ssize_t getFile(const std::string &file, const int &client_sock);
-//pulls the file from the client to the server 
-void putFile();
+void getFile(const std::string &file, const int &client_sock);
+void putFile(const std::string &filename, const int &client_sock);
 
 #endif
