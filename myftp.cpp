@@ -26,7 +26,7 @@ void getFile(const std::string &file, const int &client_sock) {
 	int fd;
 	// check if file exists on the server
 	if((fd = open(file.c_str(), O_RDONLY)) == -1) {
-		std::string errorMsg = "File {" + file + "} does not exist.\n";
+		std::string errorMsg = "File does not exist.\n";
 		if(send(client_sock, errorMsg.c_str(), sizeof(errorMsg), 0) == -1) {
 			throw "Failed to send error msg to client.\n";
 		}

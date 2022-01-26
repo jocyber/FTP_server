@@ -149,6 +149,15 @@ void handleGetCommand(const int &sockfd, const std::string &file, char output[])
 
 //upload file to server
 void handlePutCommand(const int &sockfd, const std::string &file) {
+	// check to make sure file existed on the server
+	char fileMessage[100];
+	if(recv(sockfd,	fileMessage, sizeof(fileMessage), 0) == -1)
+		errexit("Failed to receive data from the server.");
+	if(strcmp(fileMessage, "file does not exist") != 0) {
+		std::cout << fileMessage;
+		return;
+	}
+
 	int fd;
 	if((fd = open(file.c_str(), O_RDONLY)) == -1)
 			errexit("Failed to open file.\n");
