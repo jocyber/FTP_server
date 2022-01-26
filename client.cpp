@@ -79,7 +79,7 @@ int main(int argc, char **argv)
 			}
 			else if(input.substr(0,3).compare("put") == 0) {
 				// check to make sure file exists on the computer
-				std::string fileName = input.substr(5, input.length());
+				std::string fileName = input.substr(4, input.length());
 				if(access(fileName.c_str(), F_OK) == -1) {
 						std::cout << "File {" + fileName + "} does not exist.\n";
 						continue;
