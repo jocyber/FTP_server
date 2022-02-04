@@ -17,7 +17,7 @@ unsigned int numConnections = 0;
 //map the strings to codes so the strings will work with a switch statement
 std::unordered_map<std::string, int> code = {
 	{"quit", 1}, {"get", 2}, {"put", 3}, {"delete", 4}, {"ls", 5}, 
-	{"pwd", 6}, {"cd", 7}, {"mkdir", 8} };
+	{"pwd", 6}, {"cd", 7}, {"mkdir", 8}, {"quit_signal", 9} };
 
 //exit the program on critical error
 void exitFailure(const std::string str) {
@@ -205,6 +205,7 @@ void* handleClient(void *socket) {
 					//check if file already exists
 					if(access(client_input.c_str(), F_OK) == 0) {
 						const std::string existsMsg = "File already exists on server.\n";
+
 						if(send(client_sock, existsMsg.c_str(), existsMsg.length(), 0) == -1)
 							throw "Failed to send error message to client.\n";
 						break;
@@ -216,6 +217,18 @@ void* handleClient(void *socket) {
 					}
 					putFile(client_input, client_sock);//download file from client
 					break;
+
+				case 9: // quit_signal
+					//close the socket when the client has terminated the process with a signal
+					if(close(client_sock) == -1)
+						throw Network_Error("Could not close the active socket connection.\n");
+
+					if(numConnections > 0)
+						numConnections--;
+
+					stop = true; // set flag to true and end ftp session
+					break;
+
 
 				default:
 					strcpy(message, "Input not recognized.");

@@ -11,32 +11,13 @@
 #include <sys/stat.h>
 #include <netinet/tcp.h>
 #include <sys/sendfile.h>
-#include <signal.h>
 
 #define BUFFSIZE 512
 using uint = unsigned int;
 
-//socket file descriptor
-int sockfd;
-//needs to be global so signal handler can access it
-
-//function prototypes
 void errexit(const std::string message);
 void handleGetCommand(const int &sockfd, const std::string &file, char buffer[]);
 void handlePutCommand(const int &sockfd, const std::string &file);
-
-//signal handler
-void handler(int num) {
-	char signal_message[] = "quit_signal";
-	send(sockfd, signal_message, sizeof(signal_message), 0);
-
-	if(close(sockfd) == -1)
-		errexit("Failed to close the socket.");
-
-	std::cout << '\n';
-	exit(1);
-}
-
 
 int main(int argc, char **argv)
 {
@@ -46,8 +27,8 @@ int main(int argc, char **argv)
 	//command-line argument information
 	//char *name = argv[1]; domain hasn't been implemented yet
 	uint port_num = atoi(argv[2]);
-	char *domain = argv[1];
 
+	int sockfd;
 	std::string input;
 
 	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
@@ -58,15 +39,12 @@ int main(int argc, char **argv)
 
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port_num);//network byte ordering of port number
-	addr.sin_addr.s_addr = INADDR_ANY;
+	addr.sin_addr.s_addr = INADDR_ANY;//IPv4 'wildcard'
 
 	char output[BUFFSIZE] = "";
 
 	if((connect(sockfd, (struct sockaddr*) &addr, sizeof(addr))) == -1)
 		errexit("Could not connect to the socket.");
-
-	//define signal handler for the kill signal(Cntl-C)
-	signal(SIGINT, handler);//handler is a function pointer
 
 	while(true) {
 		//empty the string
@@ -175,7 +153,6 @@ void handlePutCommand(const int &sockfd, const std::string &file) {
 	char fileMessage[100];
 	if(recv(sockfd,	fileMessage, sizeof(fileMessage), 0) == -1)
 		errexit("Failed to receive data from the server.");
-
 	if(strcmp(fileMessage, "file does not exist") != 0) {
 		std::cout << fileMessage;
 		return;
