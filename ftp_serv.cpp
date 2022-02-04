@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include "myftp.h"
 
-#define PORT 2000
+// #define PORT 2000
 #define BUFFSIZE 512
 #define IP "192.168.1.100"
 unsigned int numConnections = 0;
@@ -30,6 +30,14 @@ void* handleClient(void *socket);
 
 int main(int argc, char **argv) 
 {
+	int PORT;
+	// get port number from command line
+	if(argc != 2) {
+		std::cout << "Incorrect format.\n./server {port number}\n";
+		return 0;
+	} else {
+		PORT = atoi(argv[1]);
+	}
 	int sockfd, client_sock;
 
 	//AF_INET = IPv4

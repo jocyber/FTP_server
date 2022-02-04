@@ -12,6 +12,7 @@
 #include <netinet/tcp.h>
 #include <sys/sendfile.h>
 #include <signal.h>
+#include<netdb.h>
 
 #define BUFFSIZE 512
 using uint = unsigned int;
@@ -44,9 +45,21 @@ int main(int argc, char **argv)
 		errexit("Format: ./client {server_domain_name} {port_number}\n");
 
 	//command-line argument information
-	//char *name = argv[1]; domain hasn't been implemented yet
 	uint port_num = atoi(argv[2]);
 	char *domain = argv[1];
+
+	// get ipaddress of the domain
+	struct hostent *hostInfo;
+	struct in_addr **addrList;
+
+	if((hostInfo = gethostbyname(domain)) == NULL) {
+		std::cout << "Domain name not found.\n";
+		return 0;
+	} // if
+	addrList = (struct in_addr **)hostInfo->h_addr_list;
+	char domainIP[100];
+	strcpy(domainIP, inet_ntoa(*addrList[0]));
+	std::cout << "IP: " << domainIP << std::endl;
 
 	std::string input;
 
@@ -58,7 +71,7 @@ int main(int argc, char **argv)
 
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port_num);//network byte ordering of port number
-	addr.sin_addr.s_addr = INADDR_ANY;
+	addr.sin_addr.s_addr = inet_addr(domainIP);
 
 	char output[BUFFSIZE] = "";
 
@@ -103,8 +116,8 @@ int main(int argc, char **argv)
 				// check to make sure file exists on the computer
 				std::string fileName = input.substr(4, input.length());
 				if(access(fileName.c_str(), F_OK) == -1) {
-						std::cout << "File {" + fileName + "} does not exist.\n";
-						continue;
+					std::cout << "File {" + fileName + "} does not exist.\n";
+					continue;
 				}
 				//send the file name
 				send(sockfd, input.c_str(), BUFFSIZE, 0);
@@ -138,8 +151,8 @@ void errexit(const std::string message) {
 
 //download file from server
 void handleGetCommand(const int &sockfd, const std::string &file, char output[]) {
+	// create file on local computer
 	int fd = open(file.c_str(), O_WRONLY | O_CREAT, 0666);
-
 	if(fd == -1)
 		std::cerr << "Failed to open file or already exists.\n";
 
@@ -164,6 +177,7 @@ void handleGetCommand(const int &sockfd, const std::string &file, char output[])
 
 		bytesLeft -= bytesRecieved;
 	}
+	memset(output, 0, BUFFSIZE);
 
 	if(close(fd) == -1)
 		std::cerr << "Failed to close the file.\n";
