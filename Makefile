@@ -1,8 +1,8 @@
 FLAGS := -std=c++17 -Wall -pedantic-errors -O2 -pthread
 EXE := ftp_serv
 HEADER := myftp
-CLIENT := client
-SERVER := server
+CLIENT := myftp
+SERVER := myftpserver
 
 run: $(EXE) $(CLIENT)
 
@@ -17,6 +17,12 @@ clean:
 
 memleak:
 	valgrind --leak-check=full ./$(SERVER)
+
+serv:
+	./$(SERVER)
+
+cli:
+	./$(CLIENT)
 
 commit:
 	./.commit.sh

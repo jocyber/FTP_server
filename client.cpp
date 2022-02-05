@@ -49,10 +49,8 @@ int main(int argc, char **argv)
 	struct hostent *hostInfo;
 	struct in_addr **addrList;
 
-	if((hostInfo = gethostbyname(domain)) == NULL) {
-		std::cerr << "Domain name not found.\n";
-		return EXIT_FAILURE;
-	} 
+	if((hostInfo = gethostbyname(domain)) == NULL)
+		errexit("Domain name not found.");
 
 	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 		errexit("Failed to create a socket.");
@@ -78,62 +76,74 @@ int main(int argc, char **argv)
 	signal(SIGINT, handler);//handler is a function pointer
 
 	while(true) {
-		//empty the string
-		input.clear();
-		memset(output, '\0', BUFFSIZE);
-		std::cout << "myftp> ";
+		try {
+			input.clear();//O(1)
+			memset(output, '\0', BUFFSIZE);
+			std::cout << "myftp> ";
 
-		std::getline(std::cin, input);
+			std::getline(std::cin, input);
 
-		//guard against buffer overflow
-		if(input.length() > BUFFSIZE)
-			std::cerr << "Buffer overflow.\n";
-		else {
-			if(input.substr(0,3).compare("get") == 0) {
-				//check for files existence
-				std::string file = input.substr(4, input.length());
+			//guard against buffer overflow
+			if(input.length() > BUFFSIZE)
+				throw "Buffer overflow error.";
+			else {
+				if(input.substr(0,3).compare("get") == 0) {
+					//check for files existence
+					std::string file = input.substr(4, input.length());
 
-				if(access(file.c_str(), F_OK) == 0)
-					std::cerr << "File already exists in the current directory.\n";
-				else {
-					send(sockfd, input.c_str(), BUFFSIZE, 0);
-					// check if file exists on server
-					char fileMessage[100];
-					if(recv(sockfd, fileMessage, sizeof(fileMessage), 0) == -1)
-						errexit("Failed to receive data from the server.");
+					if(access(file.c_str(), F_OK) == 0)
+						throw "File already exists in the current directory.";
+					else {
+						if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
+							throw "Failed to send the file for 'get' to the server.";
 
-					if(strcmp(fileMessage, "file exists") != 0) {
-						std::cerr << fileMessage;
-						continue;
+						// check if file exists on server
+						char fileMessage[100];
+						if(recv(sockfd, fileMessage, sizeof(fileMessage), 0) == -1)
+							throw "Failed to receive data from the server.";
+
+						if(strcmp(fileMessage, "file exists") != 0)
+							throw "File does not exist.";
+
+						handleGetCommand(sockfd, file);
+						std::cout << '\n';
+					}
+				}
+				else if(input.substr(0,3).compare("put") == 0) {
+					// check to make sure file exists on the computer
+					std::string fileName = input.substr(4, input.length());
+					
+					if(access(fileName.c_str(), F_OK) == -1) {
+						std::string error = "File {" + fileName + "} does not exist.\n";
+						throw error.c_str();
 					}
 
-					handleGetCommand(sockfd, file);
-					std::cout << '\n';
+					//send the file name
+					if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
+						throw "Failed to send the file name to the server.";
+
+					//send size and contents
+					handlePutCommand(sockfd, input.substr(4, input.length()));
+				}
+				else {
+					if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
+						throw "Failed to send the input to the server.";
+
+					if(recv(sockfd, output, BUFFSIZE, 0) == -1)
+						throw "Failed to receive data from the server.";
+
+					if(strcmp(output, "quit") == 0)
+						break;
+
+					std::cout << output << '\n';
 				}
 			}
-			else if(input.substr(0,3).compare("put") == 0) {
-				// check to make sure file exists on the computer
-				std::string fileName = input.substr(4, input.length());
-				if(access(fileName.c_str(), F_OK) == -1) {
-					std::cout << "File {" + fileName + "} does not exist.\n";
-					continue;
-				}
-				//send the file name
-				send(sockfd, input.c_str(), BUFFSIZE, 0);
-				//send size and contents
-				handlePutCommand(sockfd, input.substr(4, input.length()));
-			}
-			else {
-				send(sockfd, input.c_str(), BUFFSIZE, 0);
-
-				if(recv(sockfd, output, BUFFSIZE, 0) == -1)
-					errexit("Failed to receive data from the server.");
-
-				if(strcmp(output, "quit") == 0)
-					break;
-
-				std::cout << output << '\n';
-			}
+		}
+		catch(const char* message) {
+			std::cerr << message << '\n';
+		}
+		catch(...) {
+			std::cerr << "Unknown error occured.\n";
 		}
 	}
 
@@ -152,15 +162,13 @@ void errexit(const std::string message) {
 void handleGetCommand(const int &sockfd, const std::string &file) {
 	// create file on local computer
 	int fd = open(file.c_str(), O_WRONLY | O_CREAT, 0666);
-	if(fd == -1) {
-		std::cerr << "Failed to open file.\n";
-		return;
-	}
+	if(fd == -1)
+		throw "Failed to open file.";
 
 	// get permission of file from server
 	struct stat fileStat;
 	if(recv(sockfd, &fileStat, sizeof(fileStat), 0) == -1)
-		errexit("Failed to receive data from the server.");
+		throw "Failed to receive data from the server.";
 	
 	//keep reciving data until there's none left
 	int bytesReceived = 0, bytesLeft = fileStat.st_size;
@@ -170,17 +178,15 @@ void handleGetCommand(const int &sockfd, const std::string &file) {
 		memset(output, '\0', BUFFSIZE);
 
 		if((bytesReceived = recv(sockfd, output, BUFFSIZE, 0)) == -1)
-			errexit("Failed to receive data from the server.");
-		if(write(fd, output, bytesReceived) != bytesReceived) {
-			std::cerr << "Write error to file.";
-			return;
-		}
+			 throw "Failed to receive data from the server.";
+		if(write(fd, output, bytesReceived) != bytesReceived)
+			throw "Write error to file.";
 
 		bytesLeft -= bytesReceived;
 	}
 
 	if(close(fd) == -1)
-		std::cerr << "Failed to close the file.\n";
+		throw "Failed to close the file.";
 }
 
 //upload file to server
@@ -188,35 +194,23 @@ void handlePutCommand(const int &sockfd, const std::string &file) {
 	// check to make sure file existed on the server
 	char fileMessage[100];
 	if(recv(sockfd,	fileMessage, sizeof(fileMessage), 0) == -1)
-		errexit("Failed to receive data from the server.");
+		throw "Failed to receive data from the server.";
 
-	if(strcmp(fileMessage, "file does not exist") != 0) {
-		std::cout << fileMessage;
-		return;
-	}
+	if(strcmp(fileMessage, "file does not exist") != 0)
+		throw "File does not exist.";
 
 	int fd;
 	if((fd = open(file.c_str(), O_RDONLY)) == -1)
-			errexit("Failed to open file.\n");
+			throw "Failed to open file.";
 
 	struct stat sb;
 	fstat(fd, &sb);
 
 	//send file size first
 	if(send(sockfd, &sb, sizeof(sb), 0) == -1)
-		errexit("Failed to send file's metadata.");
-
-	int optval = 1;
-	//enable tcp_cork (only send a packet when it's full, meaning network congestion is reduced)
-	if(setsockopt(sockfd, IPPROTO_TCP, TCP_CORK, &optval, sizeof(optval)))
-		errexit("Failed to enable TCP_CORK.");
+		throw "Failed to send file's metadata.";
 
 	if(sendfile(sockfd, fd, 0, sb.st_size) == -1)
-		errexit("Failed to send file's contents.");
-
-	//disable tcp_cork
-	optval = 0;
-	if(setsockopt(sockfd, IPPROTO_TCP, TCP_CORK, &optval, sizeof(optval)) == -1)
-		errexit("Failed to disable TCP_CORK.");
+		throw "Failed to send file's contents.";
 }
 
