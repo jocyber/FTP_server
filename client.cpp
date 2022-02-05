@@ -23,7 +23,7 @@ int sockfd;
 
 //function prototypes
 void errexit(const std::string message);
-void handleGetCommand(const int &sockfd, const std::string &file, char buffer[]);
+void handleGetCommand(const int &sockfd, const std::string &file);
 void handlePutCommand(const int &sockfd, const std::string &file);
 
 //signal handler
@@ -45,7 +45,7 @@ int main(int argc, char **argv)
 	uint port_num = atoi(argv[2]);
 	char *domain = argv[1];
 
-	// get ipaddress of the domain
+	// get ip-address of the domain
 	struct hostent *hostInfo;
 	struct in_addr **addrList;
 
@@ -80,7 +80,7 @@ int main(int argc, char **argv)
 	while(true) {
 		//empty the string
 		input.clear();
-		output[0] = '\0';
+		memset(output, '\0', BUFFSIZE);
 		std::cout << "myftp> ";
 
 		std::getline(std::cin, input);
@@ -107,7 +107,8 @@ int main(int argc, char **argv)
 						continue;
 					}
 
-					handleGetCommand(sockfd, file, output);
+					handleGetCommand(sockfd, file);
+					std::cout << '\n';
 				}
 			}
 			else if(input.substr(0,3).compare("put") == 0) {
@@ -148,7 +149,7 @@ void errexit(const std::string message) {
 }
 
 //download file from server
-void handleGetCommand(const int &sockfd, const std::string &file, char output[]) {
+void handleGetCommand(const int &sockfd, const std::string &file) {
 	// create file on local computer
 	int fd = open(file.c_str(), O_WRONLY | O_CREAT, 0666);
 	if(fd == -1) {
@@ -163,9 +164,10 @@ void handleGetCommand(const int &sockfd, const std::string &file, char output[])
 	
 	//keep reciving data until there's none left
 	int bytesReceived = 0, bytesLeft = fileStat.st_size;
+	char output[BUFFSIZE];
 
 	while(bytesLeft > 0) {
-		memset(output, 0, BUFFSIZE);
+		memset(output, '\0', BUFFSIZE);
 
 		if((bytesReceived = recv(sockfd, output, BUFFSIZE, 0)) == -1)
 			errexit("Failed to receive data from the server.");
@@ -176,8 +178,6 @@ void handleGetCommand(const int &sockfd, const std::string &file, char output[])
 
 		bytesLeft -= bytesReceived;
 	}
-
-	memset(output, 0, BUFFSIZE);
 
 	if(close(fd) == -1)
 		std::cerr << "Failed to close the file.\n";

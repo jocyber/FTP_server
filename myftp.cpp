@@ -39,21 +39,13 @@ void getFile(const std::string &file, const int &client_sock) {
 			throw "Failed to send error msg to client.\n";
 
 	struct stat sb;
-	stat(file.c_str(), &sb);
+	fstat(fd, &sb);
+
 	if(send(client_sock, &sb, sizeof(sb), 0) == -1)
 		throw "Failed to send the file size.\n";
 
-	int optval = 1;
-	//enable tcp_cork (only send a packet when it's full, meaning network congestion is reduced)
-	if(setsockopt(client_sock, IPPROTO_TCP, TCP_CORK, &optval, sizeof(optval)) == -1)
-		throw "Failed to enable TCP_CORK.\n";
-
 	if(sendfile(client_sock, fd, 0, sb.st_size) == -1)
 		throw "Failed to send file contents.\n";
-	//disable tcp_cork
-	optval = 0;
-	if(setsockopt(client_sock, IPPROTO_TCP, TCP_CORK, &optval, sizeof(optval)) == -1)
-		throw "Failed to disable TCP_CORK.\n";
 	
 	if(close(fd) == -1)
 		throw "Failed to close the file.\n";
