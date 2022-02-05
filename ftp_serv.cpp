@@ -190,7 +190,10 @@ void* handleClient(void *socket) {
 
 				case 8://mkdir
 					//make directory with read and write permissions
-					if(mkdir(const_cast<char*>(client_input.c_str()), S_IRUSR | S_IWUSR) == -1) {
+					mode_t flags;
+					flags	= S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
+
+					if(mkdir(const_cast<char*>(client_input.c_str()), flags) == -1) {
 						client_input = "Directory {" + client_input + "} already exists.\n";
 
 						if(send(client_sock, client_input.c_str(), client_input.length(), 0) == -1)
