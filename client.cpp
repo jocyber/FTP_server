@@ -12,7 +12,7 @@
 #include <netinet/tcp.h>
 #include <sys/sendfile.h>
 #include <signal.h>
-#include<netdb.h>
+#include <netdb.h>
 
 #define BUFFSIZE 512
 using uint = unsigned int;
@@ -31,10 +31,7 @@ void handler(int num) {
 	char signal_message[] = "quit_signal";
 	send(sockfd, signal_message, sizeof(signal_message), 0);
 
-	if(close(sockfd) == -1)
-		errexit("Failed to close the socket.");
-
-	std::cout << '\n';
+	printf("\n");
 	exit(1);
 }
 
@@ -53,27 +50,26 @@ int main(int argc, char **argv)
 	struct in_addr **addrList;
 
 	if((hostInfo = gethostbyname(domain)) == NULL) {
-		std::cout << "Domain name not found.\n";
-		return 0;
-	} // if
-	addrList = (struct in_addr **)hostInfo->h_addr_list;
-	char domainIP[100];
-	strcpy(domainIP, inet_ntoa(*addrList[0]));
-	std::cout << "IP: " << domainIP << std::endl;
-
-	std::string input;
+		std::cerr << "Domain name not found.\n";
+		return EXIT_FAILURE;
+	} 
 
 	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 		errexit("Failed to create a socket.");
 
 	struct sockaddr_in addr;
 	memset((struct sockaddr*) &addr, 0, sizeof(addr));
+	addrList = (struct in_addr **)hostInfo->h_addr_list;
+
+	char domainIP[100];
+	strcpy(domainIP, inet_ntoa(*addrList[0]));
 
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port_num);//network byte ordering of port number
 	addr.sin_addr.s_addr = inet_addr(domainIP);
 
 	char output[BUFFSIZE] = "";
+	std::string input;
 
 	if((connect(sockfd, (struct sockaddr*) &addr, sizeof(addr))) == -1)
 		errexit("Could not connect to the socket.");
@@ -105,10 +101,12 @@ int main(int argc, char **argv)
 					char fileMessage[100];
 					if(recv(sockfd, fileMessage, sizeof(fileMessage), 0) == -1)
 						errexit("Failed to receive data from the server.");
+
 					if(strcmp(fileMessage, "file exists") != 0) {
 						std::cerr << fileMessage;
 						continue;
 					}
+
 					handleGetCommand(sockfd, file, output);
 				}
 			}
@@ -153,8 +151,10 @@ void errexit(const std::string message) {
 void handleGetCommand(const int &sockfd, const std::string &file, char output[]) {
 	// create file on local computer
 	int fd = open(file.c_str(), O_WRONLY | O_CREAT, 0666);
-	if(fd == -1)
-		std::cerr << "Failed to open file or already exists.\n";
+	if(fd == -1) {
+		std::cerr << "Failed to open file.\n";
+		return;
+	}
 
 	// get permission of file from server
 	struct stat fileStat;
@@ -162,21 +162,21 @@ void handleGetCommand(const int &sockfd, const std::string &file, char output[])
 		errexit("Failed to receive data from the server.");
 	
 	//keep reciving data until there's none left
-	int bytesLeft = fileStat.st_size;
-	int bytesRecieved;
+	int bytesReceived = 0, bytesLeft = fileStat.st_size;
 
 	while(bytesLeft > 0) {
 		memset(output, 0, BUFFSIZE);
 
-		if((bytesRecieved = recv(sockfd, output, BUFFSIZE, 0)) == -1)
+		if((bytesReceived = recv(sockfd, output, BUFFSIZE, 0)) == -1)
 			errexit("Failed to receive data from the server.");
-		if(write(fd, output, bytesRecieved) != bytesRecieved) {
+		if(write(fd, output, bytesReceived) != bytesReceived) {
 			std::cerr << "Write error to file.";
 			return;
 		}
 
-		bytesLeft -= bytesRecieved;
+		bytesLeft -= bytesReceived;
 	}
+
 	memset(output, 0, BUFFSIZE);
 
 	if(close(fd) == -1)

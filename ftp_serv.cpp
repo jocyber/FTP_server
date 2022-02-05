@@ -11,7 +11,6 @@
 
 // #define PORT 2000
 #define BUFFSIZE 512
-#define IP "192.168.1.100"
 unsigned int numConnections = 0;
 
 //map the strings to codes so the strings will work with a switch statement
@@ -30,14 +29,13 @@ void* handleClient(void *socket);
 
 int main(int argc, char **argv) 
 {
-	int PORT;
 	// get port number from command line
 	if(argc != 2) {
-		std::cout << "Incorrect format.\n./server {port number}\n";
-		return 0;
-	} else {
-		PORT = atoi(argv[1]);
+		std::cerr << "Incorrect format.\n./server {port number}\n";
+		return 1;
 	}
+
+	unsigned short PORT = atoi(argv[1]);
 	int sockfd, client_sock;
 
 	//AF_INET = IPv4
@@ -64,7 +62,7 @@ int main(int argc, char **argv)
 	//create a separate thread for each client that connects
 	pthread_t tid;
 	
-	while(true) {
+	while(true) {//on-demand model
 		//accept oncoming connection
 		if((client_sock = accept(sockfd, NULL, NULL)) == -1)
 			exitFailure("Failed to accept client connection.");
@@ -260,9 +258,8 @@ void* handleClient(void *socket) {
 		if(stop)
 			pthread_exit(EXIT_SUCCESS);
 
-		//reset buffers - O(1)
-		message[0] = '\0';
-		buffer[0] = '\0';
+		memset(message, 0, BUFFSIZE);
+		memset(buffer, 0, BUFFSIZE);
 	}
 }
 
