@@ -35,9 +35,7 @@ void handler(int num) {
 	exit(1);
 }
 
-
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
 	if(argc != 3)
 		errexit("Format: ./client {server_domain_name} {port_number}\n");
 
