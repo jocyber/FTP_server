@@ -212,18 +212,23 @@ void* handleClient(void *socket) {
 
 				case 3://put
 					//check if file already exists
-					if(access(client_input.c_str(), F_OK) == 0) {
-						const std::string existsMsg = "File already exists on server.\n";
+					FILE *fp;
 
-						if(send(client_sock, existsMsg.c_str(), existsMsg.length(), 0) == -1)
+					if((fp = fopen(client_input.c_str(), "r")) != NULL) {
+						char existsMsg[] = "File already exists on server.\n";
+						fclose(fp);
+
+						if(send(client_sock, existsMsg, sizeof(existsMsg), 0) == -1)
 							throw "Failed to send error message to client.\n";
+
 						break;
 					}
 					else {
-						std::string fileSuccess = "file does not exist";
-						if(send(client_sock, fileSuccess.c_str(), fileSuccess.length(), 0) == -1)
+						char fileSuccess[] = "file does not exist";
+						if(send(client_sock, fileSuccess, sizeof(fileSuccess), 0) == -1)
 							throw "Failed to send success message to client.\n";
 					}
+
 					putFile(client_input, client_sock);//download file from client
 					break;
 

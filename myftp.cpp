@@ -26,22 +26,23 @@ void getFile(const std::string &file, const int &client_sock) {
 	int fd;
 	// check if file exists on the server
 	if((fd = open(file.c_str(), O_RDONLY)) == -1) {
-		std::string errorMsg = "File does not exist.\n";
+		char errorMsg[] = "File does not exist.\n";
 
-		if(send(client_sock, errorMsg.c_str(), sizeof(errorMsg), 0) == -1)
+		if(send(client_sock, errorMsg, sizeof(errorMsg), 0) == -1)
 			throw "Failed to send error msg to client.\n";
 	
 		return;
 	}
 
-	std::string sucessMsg = "file exists";
-	if(send(client_sock, sucessMsg.c_str(), sizeof(sucessMsg), 0) == -1)
+	char successMsg[] = "file exists";
+	if(send(client_sock, successMsg, sizeof(successMsg), 0) == -1)
 			throw "Failed to send error msg to client.\n";
 
 	struct stat sb;
 	fstat(fd, &sb);
-
-	if(send(client_sock, &sb, sizeof(sb), 0) == -1)
+	// send file size
+	int fileSize = sb.st_size;
+	if(send(client_sock, &fileSize, sizeof(int), 0) == -1)
 		throw "Failed to send the file size.\n";
 
 	if(sendfile(client_sock, fd, 0, sb.st_size) == -1)
@@ -55,18 +56,16 @@ void putFile(const std::string &filename, const int &client_sock) {
 	int fd = open(filename.c_str(), O_WRONLY | O_CREAT, 0666);
 	char output[BUFFSIZE];
 
-	if(fd == -1) { 
-		std::cerr << "Failed to open file.\n";
-		return;
-	}
+	if(fd == -1) 
+		throw "Failed to open file.\n";
 
-	// get permission of file from server
-	struct stat fileStat;
-	if(recv(client_sock, &fileStat, sizeof(fileStat), 0) == -1)
+	// get file Size from server
+	int fileSize;
+	if(recv(client_sock, &fileSize, sizeof(int), 0) == -1)
 		throw "Failed to receive data from the client.\n";
 	
 	//keep reciving data until there's none left
-	int bytesLeft = fileStat.st_size;
+	int bytesLeft = fileSize;
 	int bytesRecieved;
 
 	while(bytesLeft > 0) {
