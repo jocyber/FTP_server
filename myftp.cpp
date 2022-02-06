@@ -26,16 +26,16 @@ void getFile(const std::string &file, const int &client_sock) {
 	int fd;
 	// check if file exists on the server
 	if((fd = open(file.c_str(), O_RDONLY)) == -1) {
-		std::string errorMsg = "File does not exist.\n";
+		char errorMsg[] = "File does not exist.\n";
 
-		if(send(client_sock, errorMsg.c_str(), sizeof(errorMsg.c_str()), 0) == -1)
+		if(send(client_sock, errorMsg, sizeof(errorMsg), 0) == -1)
 			throw "Failed to send error msg to client.\n";
 	
 		return;
 	}
 
-	std::string sucessMsg = "file exists";
-	if(send(client_sock, sucessMsg.c_str(), sizeof(sucessMsg), 0) == -1)
+	char successMsg[] = "file exists";
+	if(send(client_sock, successMsg, sizeof(successMsg), 0) == -1)
 			throw "Failed to send error msg to client.\n";
 
 	struct stat sb;
@@ -56,10 +56,8 @@ void putFile(const std::string &filename, const int &client_sock) {
 	int fd = open(filename.c_str(), O_WRONLY | O_CREAT, 0666);
 	char output[BUFFSIZE];
 
-	if(fd == -1) { 
-		std::cerr << "Failed to open file.\n";
-		return;
-	}
+	if(fd == -1) 
+		throw "Failed to open file.\n";
 
 	// get file Size from server
 	int fileSize;

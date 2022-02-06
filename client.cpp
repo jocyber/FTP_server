@@ -116,11 +116,10 @@ int main(int argc, char **argv) {
 					// check to make sure file exists on the computer					
 					FILE* fp;
 					fp = fopen(fileName.c_str(), "r");
-					if(fp == NULL) {
-						std::cout << "File does not exist in current directory.\n";
-						continue;
-					}
+					if(fp == NULL)
+						throw "File does not exist in current directory.\n";
 
+					fclose(fp);
 					//send the file name
 					if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
 						throw "Failed to send the file name to the server.";

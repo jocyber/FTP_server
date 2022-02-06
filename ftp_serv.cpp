@@ -212,11 +212,15 @@ void* handleClient(void *socket) {
 
 				case 3://put
 					//check if file already exists
-					if(fopen(client_input.c_str(),"r")) {
+					FILE *fp;
+
+					if((fp = fopen(client_input.c_str(), "r")) != NULL) {
 						char existsMsg[] = "File already exists on server.\n";
+						fclose(fp);
 
 						if(send(client_sock, existsMsg, sizeof(existsMsg), 0) == -1)
 							throw "Failed to send error message to client.\n";
+
 						break;
 					}
 					else {
@@ -224,6 +228,7 @@ void* handleClient(void *socket) {
 						if(send(client_sock, fileSuccess, sizeof(fileSuccess), 0) == -1)
 							throw "Failed to send success message to client.\n";
 					}
+
 					putFile(client_input, client_sock);//download file from client
 					break;
 
