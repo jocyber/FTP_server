@@ -92,9 +92,10 @@ int main(int argc, char **argv) {
 					// check if the file already exists in current directory
 					FILE* fp;
 					fp = fopen(file.c_str(), "r");
+
 					if(fp) {
-						std::cout << "File already exists in current directory, won't overwrite.\n";
-						continue;
+						fclose(fp);
+						throw "File already exists in current directory, won't overwrite.\n";
 					}
 
 					if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
@@ -199,11 +200,7 @@ void handlePutCommand(const int &sockfd, const std::string &file) {
 		throw "Failed to receive data from the server.";
 
 	if(strcmp(fileMessage, "file does not exist") != 0)
-<<<<<<< HEAD
 		throw "File already exists on the server.";
-=======
-		throw "File already exists on the server";
->>>>>>> main
 
 	int fd;
 	if((fd = open(file.c_str(), O_RDONLY)) == -1)
@@ -219,5 +216,8 @@ void handlePutCommand(const int &sockfd, const std::string &file) {
 
 	if(sendfile(sockfd, fd, 0, sb.st_size) == -1)
 		throw "Failed to send file's contents.";
+
+	if(close(fd) == -1)
+		throw "Failed to close the file.";
 }
 
