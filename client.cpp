@@ -195,7 +195,7 @@ void handlePutCommand(const int &sockfd, const std::string &file) {
 		throw "Failed to receive data from the server.";
 
 	if(strcmp(fileMessage, "file does not exist") != 0)
-		throw "File does not exist.";
+		throw "File already exists on the server";
 
 	int fd;
 	if((fd = open(file.c_str(), O_RDONLY)) == -1)
