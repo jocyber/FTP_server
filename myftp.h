@@ -27,7 +27,7 @@ public:
 	}
 };
 
-int listDirectories(DIR *direct, struct dirent *dirP, std::string &message);
+void listDirectories(const int &client_sock);
 void getFile(const std::string &file, const int &client_sock);
 void putFile(const std::string &filename, const int &client_sock);
 

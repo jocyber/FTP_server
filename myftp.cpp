@@ -3,21 +3,29 @@
 #include <netinet/tcp.h>
 #include <stdio.h>
 #include <exception>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
 
 //read the current directory
-int listDirectories(DIR *direct, struct dirent *dirP, std::string &message) {
-	while((dirP = readdir(direct)) != NULL) {
-		if(dirP->d_name[0] == '.')
-			continue;
+void listDirectories(const int &client_sock) {
+	FILE *fd = popen("ls", "r");
 
-		if((message.length() + sizeof(dirP->d_name)) > BUFFSIZE) {
-			return message.length();
-		}
+	if(fd == NULL)
+		throw "Failed to execute 'ls' on the command-line.";
 
-		message = message + dirP->d_name + ' ';
+	char buffer[BUFFSIZE];
+	while(fgets(buffer, BUFFSIZE, fd) != NULL) {
+		if(send(client_sock, buffer, BUFFSIZE, 0) == -1)
+			throw "Failed to send 'ls' message to client.\n";
 	}
 
-	return 0;
+	fclose(fd);
+
+	char temp[] = "";
+	if(send(client_sock, temp, sizeof(temp), 0) == -1)
+		throw "Failed to send 'ls' message to client.\n";
 }
 
 //send file to the client

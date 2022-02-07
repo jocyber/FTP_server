@@ -3,7 +3,7 @@ EXE := ftp_serv
 HEADER := myftp
 CLIENT := client
 SERVER := myftpserver
-PORT := 2203
+PORT := 2200
 
 run: $(EXE) $(HEADER)
 
