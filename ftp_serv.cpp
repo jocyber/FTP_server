@@ -6,7 +6,7 @@
 #include "myftp.h"
 
 // #define PORT 2000
-#define BUFFSIZE 1024
+#define BUFFSIZE 1000
 unsigned int numConnections = 0;
 
 //map the strings to codes so the strings will work with a switch statement

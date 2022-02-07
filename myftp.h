@@ -12,7 +12,7 @@
 #include <exception>
 #include <unordered_map>
 
-#define BUFFSIZE 1024
+#define BUFFSIZE 1000
 
 //custom exception for network errors
 class Network_Error : std::exception {

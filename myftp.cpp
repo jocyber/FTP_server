@@ -19,6 +19,8 @@ void listDirectories(const int &client_sock) {
 	while(fgets(buffer, BUFFSIZE, fd) != NULL) {
 		if(send(client_sock, buffer, BUFFSIZE, 0) == -1)
 			throw "Failed to send 'ls' message to client.\n";
+
+		memset(buffer, '\0', sizeof(buffer));
 	}
 
 	fclose(fd);

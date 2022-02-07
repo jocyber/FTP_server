@@ -14,7 +14,7 @@
 #include <netdb.h>
 #include <unordered_map>
 
-#define BUFFSIZE 1024
+#define BUFFSIZE 1000
 //socket file descriptor
 //needs to be global so signal handler can access it
 int sockfd;
