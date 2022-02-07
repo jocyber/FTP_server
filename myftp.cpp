@@ -5,20 +5,19 @@
 #include <exception>
 
 //read the current directory
-void listDirectories(char message[]) {
-	char path[] = "./";
-	char space[] = " ";
-
-	DIR *direct = opendir(path);
-	struct dirent *dirP;	
-
+int listDirectories(DIR *direct, struct dirent *dirP, std::string &message) {
 	while((dirP = readdir(direct)) != NULL) {
 		if(dirP->d_name[0] == '.')
 			continue;
 
-		strcat(message, dirP->d_name);
-		strcat(message, space);
+		if((message.length() + sizeof(dirP->d_name)) > BUFFSIZE) {
+			return message.length();
+		}
+
+		message = message + dirP->d_name + ' ';
 	}
+
+	return 0;
 }
 
 //send file to the client

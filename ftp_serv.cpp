@@ -3,10 +3,6 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <pthread.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <dirent.h>
-#include <stdlib.h>
 #include "myftp.h"
 
 // #define PORT 2000
@@ -121,10 +117,25 @@ void* handleClient(void *socket) {
 			//compare the client input to different options.
 			switch(option) {
 				case 5: {// ls
-					listDirectories(message);
+					int send_size;
+					std::string ls_mess = "";
+					
+					char path[] = "./";
+					DIR *direct = opendir(path);
+					struct dirent *dirP;
 
-					if(send(client_sock, message, sizeof(message), 0) == -1)
-						throw "Failed to send 'ls' message to client.\n";
+					do {
+						ls_mess.clear();
+						send_size = listDirectories(direct, dirP, ls_mess);
+
+						if(send(client_sock, ls_mess.c_str(), ls_mess.length(), 0) == -1)
+							throw "Failed to send 'ls' message to client.\n";
+					}while(send_size > 0);
+
+					//let the client know ls is done sending packets.
+					char temp[] = "";
+					if(send(client_sock, temp, sizeof(temp), 0) == -1)
+						throw "Failed to send 'ls' termination message to client.\n";
 
 					break;
 				}

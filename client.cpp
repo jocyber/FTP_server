@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
-#include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <netinet/tcp.h>
@@ -17,13 +16,13 @@
 
 #define BUFFSIZE 1024
 //socket file descriptor
+//needs to be global so signal handler can access it
 int sockfd;
 
 //string to int mappings
 std::unordered_map<std::string, int> code = {
 	{"quit", 1}, {"get", 2}, {"put", 3}, {"delete", 4}, {"ls", 5}, 
 	{"pwd", 6}, {"cd", 7}, {"mkdir", 8} };
-//needs to be global so signal handler can access it
 
 //function prototypes
 void errexit(const std::string message);
@@ -158,6 +157,25 @@ int main(int argc, char **argv) {
 
 						return EXIT_SUCCESS;
 					}
+
+					case 5: { // ls
+						int recv_size;
+						
+						if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
+							throw "Failed to send the input to the server.";
+
+						while(true) {
+							memset(output, '\0', BUFFSIZE);
+
+							if((recv_size = recv(sockfd, output, BUFFSIZE, 0)) > 1)
+								std::cout << output;
+							else
+								break;
+						}
+
+						std::cout << '\n';
+						break;
+					}	
 
 					default:
 						if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)

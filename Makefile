@@ -3,6 +3,7 @@ EXE := ftp_serv
 HEADER := myftp
 CLIENT := client
 SERVER := myftpserver
+PORT := 2203
 
 run: $(EXE) $(HEADER)
 
@@ -19,10 +20,13 @@ memleak:
 	valgrind --leak-check=full ./$(SERVER)
 
 serv:
-	./$(SERVER)
+	./$(SERVER) $(PORT)
 
 cli:
-	./$(HEADER)
+	./$(HEADER) odin.cs.uga.edu $(PORT)
+
+move:
+	scp myftpserver jeh82014@odin.cs.uga.edu:~
 
 commit:
 	./.commit.sh
