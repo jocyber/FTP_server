@@ -13,7 +13,7 @@ void listDirectories(char message[]) {
 	struct dirent *dirP;	
 
 	while((dirP = readdir(direct)) != NULL) {
-		if(strcmp(dirP->d_name, ".") == 0 || strcmp(dirP->d_name, "..") == 0)
+		if(dirP->d_name[0] == '.')
 			continue;
 
 		strcat(message, dirP->d_name);

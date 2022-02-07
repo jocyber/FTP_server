@@ -13,12 +13,16 @@
 #include <sys/sendfile.h>
 #include <signal.h>
 #include <netdb.h>
+#include <unordered_map>
 
-#define BUFFSIZE 512
-using uint = unsigned int;
-
+#define BUFFSIZE 1024
 //socket file descriptor
 int sockfd;
+
+//string to int mappings
+std::unordered_map<std::string, int> code = {
+	{"quit", 1}, {"get", 2}, {"put", 3}, {"delete", 4}, {"ls", 5}, 
+	{"pwd", 6}, {"cd", 7}, {"mkdir", 8} };
 //needs to be global so signal handler can access it
 
 //function prototypes
@@ -70,13 +74,14 @@ int main(int argc, char **argv) {
 	if((connect(sockfd, (struct sockaddr*) &addr, sizeof(addr))) == -1)
 		errexit("Could not connect to the socket.");
 
+	int option;
 	//define signal handler for the kill signal(Cntl-C)
 	signal(SIGINT, handler);//handler is a function pointer
 
 	while(true) {
 		try {
 			input.clear();//O(1)
-			memset(output, '\0', BUFFSIZE);
+			memset(output, '\0', BUFFSIZE);//clear array (fastest standard way)
 			std::cout << "myftp> ";
 
 			std::getline(std::cin, input);
@@ -85,60 +90,83 @@ int main(int argc, char **argv) {
 			if(input.length() > BUFFSIZE)
 				throw "Buffer overflow error.";
 			else {
-				if(input.substr(0,3).compare("get") == 0) {
-					//check for files existence
-					std::string file = input.substr(4, input.length());
+				//get the command type
+				std::string req = "";
 
-					// check if the file already exists in current directory
-					FILE* fp;
-					fp = fopen(file.c_str(), "r");
+				for(unsigned int i = 0; input[i] != ' ' && i < input.length(); ++i)
+					req += input[i];
 
-					if(fp) {
+				if(code.find(req) == code.end())
+					option = -1;
+				else
+					option = code[req];
+
+				//switch on result
+				switch(option) {
+					case 2: {//get
+						//check for files existence
+						std::string file = input.substr(4, input.length());
+
+						// check if the file already exists in current directory
+						FILE* fp;
+						fp = fopen(file.c_str(), "r");
+
+						if(fp) {
+							fclose(fp);
+							throw "File already exists in current directory, won't overwrite.\n";
+						}
+
+						if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
+							throw "Failed to send the file for 'get' to the server.";
+
+						// check if file exists on server
+						char fileMessage[100];
+						if(recv(sockfd, fileMessage, sizeof(fileMessage), 0) == -1)
+							throw "Failed to receive data from the server.";
+
+						if(strcmp(fileMessage, "file exists") != 0)
+							throw "File does not exist on the server.";
+
+						handleGetCommand(sockfd, file);
+						break;
+					}
+					case 3: {//put
+						std::string fileName = input.substr(4, input.length());
+
+						// check to make sure file exists on the computer					
+						FILE* fp;
+						fp = fopen(fileName.c_str(), "r");
+						if(fp == NULL)
+							throw "File does not exist in current directory.\n";
+
 						fclose(fp);
-						throw "File already exists in current directory, won't overwrite.\n";
+						//send the file name
+						if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
+							throw "Failed to send the file name to the server.";
+
+						//send size and contents
+						handlePutCommand(sockfd, input.substr(4, input.length()));
+						break;
+					}
+					case 1: {//quit
+						char quit_mess[] = "quit";
+						if(send(sockfd, quit_mess, sizeof(quit_mess), 0) == -1)
+							throw "Failed to send the input to the server.";
+
+						if(close(sockfd) == -1)
+							errexit("Failed to close the socket.");
+
+						return EXIT_SUCCESS;
 					}
 
-					if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
-						throw "Failed to send the file for 'get' to the server.";
+					default:
+						if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
+							throw "Failed to send the input to the server.";
 
-					// check if file exists on server
-					char fileMessage[100];
-					if(recv(sockfd, fileMessage, sizeof(fileMessage), 0) == -1)
-						throw "Failed to receive data from the server.";
+						if(recv(sockfd, output, BUFFSIZE, 0) == -1)
+							throw "Failed to receive data from the server.";
 
-					if(strcmp(fileMessage, "file exists") != 0)
-						throw "File does not exist.";
-
-					handleGetCommand(sockfd, file);
-				}
-				else if(input.substr(0,3).compare("put") == 0) {
-					std::string fileName = input.substr(4, input.length());
-
-					// check to make sure file exists on the computer					
-					FILE* fp;
-					fp = fopen(fileName.c_str(), "r");
-					if(fp == NULL)
-						throw "File does not exist in current directory.\n";
-
-					fclose(fp);
-					//send the file name
-					if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
-						throw "Failed to send the file name to the server.";
-
-					//send size and contents
-					handlePutCommand(sockfd, input.substr(4, input.length()));
-				}
-				else {
-					if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
-						throw "Failed to send the input to the server.";
-
-					if(recv(sockfd, output, BUFFSIZE, 0) == -1)
-						throw "Failed to receive data from the server.";
-
-					if(strcmp(output, "quit") == 0)
-						break;
-
-					std::cout << output << '\n';
+						std::cout << output << '\n';
 				}
 			}
 		}
@@ -149,11 +177,6 @@ int main(int argc, char **argv) {
 			std::cerr << "Unknown error occured.\n";
 		}
 	}
-
-	if(close(sockfd) == -1)
-		errexit("Failed to close the socket.");
-
-	return EXIT_SUCCESS;
 }
 
 void errexit(const std::string message) {

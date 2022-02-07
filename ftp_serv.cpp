@@ -10,7 +10,7 @@
 #include "myftp.h"
 
 // #define PORT 2000
-#define BUFFSIZE 512
+#define BUFFSIZE 1024
 unsigned int numConnections = 0;
 
 //map the strings to codes so the strings will work with a switch statement
@@ -120,13 +120,14 @@ void* handleClient(void *socket) {
 			//general logic for the ftp server starts here
 			//compare the client input to different options.
 			switch(option) {
-				case 5: // ls
+				case 5: {// ls
 					listDirectories(message);
 
-					if(send(client_sock, message, BUFFSIZE, 0) == -1)
+					if(send(client_sock, message, sizeof(message), 0) == -1)
 						throw "Failed to send 'ls' message to client.\n";
 
 					break;
+				}
 
 				case 7: // cd
 					//change the directory
@@ -159,12 +160,7 @@ void* handleClient(void *socket) {
 
 					break;
 
-				case 1://quit
-					strcpy(message, "quit");
-					
-					if(send(client_sock, message, BUFFSIZE, 0) == -1)
-						throw Network_Error("Failed to send 'quit' message to client.\n");
-
+				case 1: case 9://quit or quit_signal
 					//close the socket when the client has left the active session
 					if(close(client_sock) == -1)
 						throw Network_Error("Could not close the active socket connection.\n");
@@ -179,6 +175,7 @@ void* handleClient(void *socket) {
 					//remove file or empty directory
 					if(remove(const_cast<char*>(client_input.c_str())) == -1) {
 						client_input = "File: {" + client_input + "} does not exist.\n";
+						
 						if(send(client_sock, client_input.c_str(), client_input.length(), 0) == -1)
 							throw "Failed to send error message for 'delete'.\n";
 					}
@@ -191,7 +188,7 @@ void* handleClient(void *socket) {
 				case 8://mkdir
 					//make directory with read and write permissions
 					mode_t flags;
-					flags	= S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
+					flags = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
 
 					if(mkdir(const_cast<char*>(client_input.c_str()), flags) == -1) {
 						client_input = "Directory {" + client_input + "} already exists.\n";
@@ -231,18 +228,6 @@ void* handleClient(void *socket) {
 
 					putFile(client_input, client_sock);//download file from client
 					break;
-
-				case 9: // quit_signal
-					//close the socket when the client has terminated the process with a signal
-					if(close(client_sock) == -1)
-						throw Network_Error("Could not close the active socket connection.\n");
-
-					if(numConnections > 0)
-						numConnections--;
-
-					stop = true; // set flag to true and end ftp session
-					break;
-
 
 				default:
 					strcpy(message, "Input not recognized.");
