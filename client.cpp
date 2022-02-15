@@ -13,6 +13,7 @@
 #include <signal.h>
 #include <netdb.h>
 #include <unordered_map>
+#include <pthread.h>
 
 #define BUFFSIZE 1000
 //socket file descriptor
@@ -22,7 +23,7 @@ int sockfd;
 //string to int mappings
 std::unordered_map<std::string, int> code = {
 	{"quit", 1}, {"get", 2}, {"put", 3}, {"delete", 4}, {"ls", 5}, 
-	{"pwd", 6}, {"cd", 7}, {"mkdir", 8} };
+	{"pwd", 6}, {"cd", 7}, {"mkdir", 8}, {"terminate", 9} };
 
 //function prototypes
 void errexit(const std::string message);
@@ -176,6 +177,10 @@ int main(int argc, char **argv) {
 						std::cout << '\n';
 						break;
 					}	
+
+					case 9: { // terminate
+						break;
+					}
 
 					default:
 						if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)

@@ -7,7 +7,7 @@ PORT := 2203
 
 run: $(EXE) $(HEADER)
 
-%: %.cpp $(HEADER).cpp
+%: server_source/%.cpp server_source/*.cpp
 	g++ $(FLAGS) $^ -o $(SERVER)
 
 $(HEADER): $(CLIENT).cpp
