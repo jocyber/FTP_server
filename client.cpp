@@ -27,8 +27,10 @@ std::unordered_map<std::string, int> code = {
 
 //function prototypes
 void errexit(const std::string message);
-void handleGetCommand(const int &sockfd, const std::string &file);
-void handlePutCommand(const int &sockfd, const std::string &file);
+void handleGetCommand(const int &sockfd, const std::string &input);
+void handlePutCommand(const int &sockfd, const std::string &input);
+void *handleGetBackground(void* arg);
+void *handlePutBackground(void* arg);
 
 //signal handler
 void handler(int num) {
@@ -101,51 +103,40 @@ int main(int argc, char **argv) {
 				else
 					option = code[req];
 
+				bool isBackground = false;
+				if(input[input.length() - 1] == '&') {
+					input = input.substr(0,input.length() - 2);
+					isBackground = true;
+				}
+
 				//switch on result
 				switch(option) {
 					case 2: {//get
-						//check for files existence
-						std::string file = input.substr(4, input.length());
-
-						// check if the file already exists in current directory
-						FILE* fp;
-						fp = fopen(file.c_str(), "r");
-
-						if(fp) {
-							fclose(fp);
-							throw "File already exists in current directory, won't overwrite.\n";
+						if(isBackground) {
+							pthread_t tid;
+							char temp[BUFFSIZE];
+							strcpy(temp, input.c_str());
+							int status = pthread_create(&tid, NULL, handleGetBackground, temp);
+							if(status != 0) {
+								throw "Unable to create thread.\n";
+							}
+						} else {
+							handleGetCommand(sockfd, input);
 						}
-
-						if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
-							throw "Failed to send the file for 'get' to the server.";
-
-						// check if file exists on server
-						char fileMessage[100];
-						if(recv(sockfd, fileMessage, sizeof(fileMessage), 0) == -1)
-							throw "Failed to receive data from the server.";
-
-						if(strcmp(fileMessage, "file exists") != 0)
-							throw "File does not exist on the server.";
-
-						handleGetCommand(sockfd, file);
 						break;
 					}
 					case 3: {//put
-						std::string fileName = input.substr(4, input.length());
-
-						// check to make sure file exists on the computer					
-						FILE* fp;
-						fp = fopen(fileName.c_str(), "r");
-						if(fp == NULL)
-							throw "File does not exist in current directory.\n";
-
-						fclose(fp);
-						//send the file name
-						if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
-							throw "Failed to send the file name to the server.";
-
-						//send size and contents
-						handlePutCommand(sockfd, input.substr(4, input.length()));
+						if(isBackground) {
+							pthread_t tid;
+							char temp[BUFFSIZE];
+							strcpy(temp, input.c_str());
+							int status = pthread_create(&tid, NULL, handlePutBackground, temp);
+							if(status != 0) {
+								throw "Unable to create thread.\n";
+							}
+						} else {
+							handlePutCommand(sockfd, input);
+						}
 						break;
 					}
 					case 1: {//quit
@@ -207,8 +198,52 @@ void errexit(const std::string message) {
 	exit(EXIT_FAILURE);
 }
 
+void *handleGetBackground(void* arg) {
+	try {
+		char *temp = (char*)arg;
+		std::string inputText(temp);
+		handleGetCommand(sockfd, inputText);
+	} catch(const char* hello) {
+		std::cerr << hello << "\n";
+	}
+	pthread_exit(0);
+}
+
+void *handlePutBackground(void* arg) {
+	try {
+		char *temp = (char*)arg;
+		std::string inputText(temp);
+		handlePutCommand(sockfd, inputText);
+	} catch(const char* hello) {
+		std::cerr << hello << "\n";
+	}
+	pthread_exit(0);
+}
+
 //download file from server
-void handleGetCommand(const int &sockfd, const std::string &file) {
+void handleGetCommand(const int &sockfd, const std::string &input) {
+	//check for files existence
+	std::string file = input.substr(4, input.length());
+
+	// check if the file already exists in current directory
+	FILE* fp;
+	fp = fopen(file.c_str(), "r");
+
+	if(fp) {
+		fclose(fp);
+		throw "File already exists in current directory, won't overwrite.\n";
+	}
+
+	if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
+		throw "Failed to send the file for 'get' to the server.";
+
+	// check if file exists on server
+	char fileMessage[100];
+	if(recv(sockfd, fileMessage, sizeof(fileMessage), 0) == -1)
+		throw "Failed to receive data from the server.";
+
+	if(strcmp(fileMessage, "file exists") != 0)
+		throw "File does not exist on the server.";
 	// create file on local computer
 	int fd = open(file.c_str(), O_WRONLY | O_CREAT, 0666);
 	if(fd == -1)
@@ -239,7 +274,20 @@ void handleGetCommand(const int &sockfd, const std::string &file) {
 }
 
 //upload file to server
-void handlePutCommand(const int &sockfd, const std::string &file) {
+void handlePutCommand(const int &sockfd, const std::string &input) {
+	std::string fileName = input.substr(4, input.length());
+
+	// check to make sure file exists on the computer					
+	FILE* fp;
+	fp = fopen(fileName.c_str(), "r");
+	if(fp == NULL)
+		throw "File does not exist in current directory.\n";
+
+	fclose(fp);
+	//send the file name
+	if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
+		throw "Failed to send the file name to the server.";
+
 	// check to make sure file dosen't exist on server
 	char fileMessage[100];
 	if(recv(sockfd,	fileMessage, sizeof(fileMessage), 0) == -1)
@@ -249,7 +297,7 @@ void handlePutCommand(const int &sockfd, const std::string &file) {
 		throw "File already exists on the server.";
 
 	int fd;
-	if((fd = open(file.c_str(), O_RDONLY)) == -1)
+	if((fd = open(fileName.c_str(), O_RDONLY)) == -1)
 			throw "Failed to open file.";
 
 	struct stat sb;
