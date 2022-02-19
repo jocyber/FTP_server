@@ -29,5 +29,21 @@ void* handle_termination(void* port) {
 	if(listen(sockfd, SOMAXCONN) == -1)
 		exitFailure("Could not set up a passive socket connection in termination thread.");
 
+	unsigned int cid;
+	while(true) {
+		int client_sock;
+
+		if((client_sock = accept(sockfd, NULL, NULL)) == -1) {
+			std::cerr << "Check shit.\n";
+			continue;
+		}
+
+		recv(client_sock, &cid, sizeof(cid), 0);
+		pthread_mutex_lock(&hashTableLock);
+		globalTable[commandID] = true;
+		pthread_mutex_unlock(&hashTableLock);
+
+	}
+
     pthread_exit(0); //just here for now to avoid compiler warnings
 }

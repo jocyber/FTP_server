@@ -18,7 +18,7 @@
 #define BUFFSIZE 1000
 //socket file descriptor
 //needs to be global so signal handler can access it
-int sockfd;
+int sockfd, sockfd2;
 
 //string to int mappings
 std::unordered_map<std::string, int> code = {
@@ -42,11 +42,12 @@ void handler(int num) {
 }
 
 int main(int argc, char **argv) {
-	if(argc != 3)
-		errexit("Format: ./client {server_domain_name} {port_number}\n");
+	if(argc != 4)
+		errexit("Format: ./client {server_domain_name} {nport} {tport}\n");
 
 	//command-line argument information
 	uint port_num = atoi(argv[2]);
+	uint t_port_num = atoi(argv[3]);
 	char *domain = argv[1];
 
 	// get ip-address of the domain
@@ -57,6 +58,9 @@ int main(int argc, char **argv) {
 		errexit("Domain name not found.");
 
 	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+		errexit("Failed to create a socket.");
+
+	if((sockfd2 = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 		errexit("Failed to create a socket.");
 
 	struct sockaddr_in addr;
@@ -74,7 +78,11 @@ int main(int argc, char **argv) {
 	std::string input;
 
 	if((connect(sockfd, (struct sockaddr*) &addr, sizeof(addr))) == -1)
-		errexit("Could not connect to the socket.");
+		errexit("Could not connect to nport.");
+
+	addr.sin_port = htons(t_port_num);//network byte ordering of port number		
+	if((connect(sockfd2, (struct sockaddr*) &addr, sizeof(addr))) == -1)
+		errexit("Could not connect to tport.");
 
 	int option;
 	//define signal handler for the kill signal(Cntl-C)
@@ -105,7 +113,7 @@ int main(int argc, char **argv) {
 
 				bool isBackground = false;
 				if(input[input.length() - 1] == '&') {
-					input = input.substr(0,input.length() - 2);
+					//input = input.substr(0,input.length() - 2);
 					isBackground = true;
 				}
 
@@ -223,7 +231,7 @@ void *handlePutBackground(void* arg) {
 //download file from server
 void handleGetCommand(const int &sockfd, const std::string &input) {
 	//check for files existence
-	std::string file = input.substr(4, input.length());
+	std::string file = input.substr(4, input.length() - 2);
 
 	// check if the file already exists in current directory
 	FILE* fp;
@@ -236,6 +244,12 @@ void handleGetCommand(const int &sockfd, const std::string &input) {
 
 	if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
 		throw "Failed to send the file for 'get' to the server.";
+
+	// get cid
+	unsigned int cid;
+	if(recv(sockfd, &cid, sizeof(cid), 0) == -1)
+		throw "Failed to receive data from the server.";
+	std::cout << "Get executed with cid of " << cid << "\n";
 
 	// check if file exists on server
 	char fileMessage[100];
@@ -268,6 +282,15 @@ void handleGetCommand(const int &sockfd, const std::string &input) {
 
 		bytesLeft -= bytesReceived;
 	}
+	// int recv_size;
+	// while(true) {
+	// 	memset(output, '\0', BUFFSIZE);
+
+	// 	if((recv_size = recv(sockfd, output, BUFFSIZE, 0)) > 1)
+	// 		std::cout << output;
+	// 	else
+	// 		break;
+	// }
 
 	if(close(fd) == -1)
 		throw "Failed to close the file.";
@@ -275,7 +298,7 @@ void handleGetCommand(const int &sockfd, const std::string &input) {
 
 //upload file to server
 void handlePutCommand(const int &sockfd, const std::string &input) {
-	std::string fileName = input.substr(4, input.length());
+	std::string fileName = input.substr(4, input.length() - 2);
 
 	// check to make sure file exists on the computer					
 	FILE* fp;

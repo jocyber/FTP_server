@@ -3,7 +3,6 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <pthread.h>
-#include "myftp.h"
 #include "client_handlers.h"
 
 //exit the program on critical error
@@ -19,6 +18,9 @@ int main(int argc, char **argv)
 		std::cerr << "Incorrect format. exe {server port} {terminate port}";
 		return 1;
 	}
+
+	pthread_mutex_init(&commandID_lock, NULL);
+	pthread_mutex_init(&hashTableLock, NULL);
 
 	unsigned short nPORT = atoi(argv[1]); // normal port
 	unsigned short tPORT = atoi(argv[2]); //terminate port

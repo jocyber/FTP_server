@@ -77,6 +77,8 @@ void* connect_client(void *socket) {
 			if((recv(client_sock, buffer, BUFFSIZE, 0)) == -1)
 				throw "Failed to receive data from the client.";
 
+				std::cout << buffer << "\n";
+
 			std::string command, client_input(buffer);
 			unsigned int i = 0;
 
@@ -85,8 +87,12 @@ void* connect_client(void *socket) {
 				command += client_input[i];
 	
 			//client_input now becomes the argument
-			if(command.length() != client_input.length())
-				client_input = client_input.substr(i + 1, client_input.length());	
+			if(client_input[client_input.length() - 1] == '&') {
+				client_input = client_input.substr(i + 1, client_input.length() - 1 - i);
+			} else {
+				if(command.length() != client_input.length())
+					client_input = client_input.substr(i + 1, client_input.length());	
+			}
 
 			int option;
 			if(code.find(command) == code.end())// if command is not valid
@@ -176,8 +182,28 @@ void* connect_client(void *socket) {
 					break;
 
 				case 2://get
-					//endline to make parsing the packet easier
-					getFile(client_input, client_sock); // upload file to client
+					unsigned int tempcid;
+					// send commandID to client
+					pthread_mutex_lock(&commandID_lock);
+					
+					// add to hash table
+					pthread_mutex_lock(&hashTableLock);
+					globalTable[commandID] = false;
+					pthread_mutex_unlock(&hashTableLock);
+
+					if(send(client_sock, &commandID, sizeof(commandID), 0) == -1)
+						throw "Failed to send error msg to client.\n";
+
+					getFile(client_input, client_sock, commandID); // upload file to client
+					commandID++;
+					pthread_mutex_unlock(&commandID_lock);
+
+					getFile(client_input, client_sock, tempcid); // upload file to client
+
+					// remove from hash table
+					pthread_mutex_lock(&hashTableLock);
+					globalTable.erase(tempcid);
+					pthread_mutex_lock(&hashTableLock);
 					break;
 
 				case 3://put
@@ -199,7 +225,7 @@ void* connect_client(void *socket) {
 							throw "Failed to send success message to client.\n";
 					}
 
-					putFile(client_input, client_sock);//download file from client
+					putFile(client_input, client_sock, commandID);//download file from client
 					break;
 
 				default:

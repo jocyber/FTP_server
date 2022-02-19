@@ -1,4 +1,4 @@
-#include "myftp.h"
+#include "client_handlers.h"
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <stdio.h>
@@ -31,7 +31,7 @@ void listDirectories(const int &client_sock) {
 }
 
 //send file to the client
-void getFile(const std::string &file, const int &client_sock) {
+void getFile(const std::string &file, const int &client_sock, unsigned int cid) {
 	int fd;
 	// check if file exists on the server
 	if((fd = open(file.c_str(), O_RDONLY)) == -1) {
@@ -54,14 +54,26 @@ void getFile(const std::string &file, const int &client_sock) {
 	if(send(client_sock, &fileSize, sizeof(int), 0) == -1)
 		throw "Failed to send the file size.\n";
 
+	int bytesSent = 0;
+	char buffer[BUFFSIZE];
+
+	// while(bytesSent < fileSize) {
+	// 	int bytesRead = read(fd, buffer, BUFFSIZE);
+
+	// 	if(send(client_sock, buffer, bytesRead, 0) == -1)
+	// 		throw "Failed to send 'ls' message to client.\n";
+
+	// 	bytesSent += bytesRead;
+	// }
+
 	if(sendfile(client_sock, fd, 0, sb.st_size) == -1)
 		throw "Failed to send file contents.\n";
-	
+
 	if(close(fd) == -1)
 		throw "Failed to close the file.\n";
 }
 
-void putFile(const std::string &filename, const int &client_sock) {
+void putFile(const std::string &filename, const int &client_sock, unsigned int cid) {
 	int fd = open(filename.c_str(), O_WRONLY | O_CREAT, 0666);
 	char output[BUFFSIZE];
 

@@ -12,6 +12,11 @@
 #include <stdlib.h>
 #include "myftp.h"
 
+inline unsigned int commandID = 0;
+inline pthread_mutex_t commandID_lock;
+inline pthread_mutex_t hashTableLock;
+inline std::unordered_map<unsigned int, bool> globalTable;
+
 void* handle_client(void* port);
 void* handle_termination(void* port);
 
