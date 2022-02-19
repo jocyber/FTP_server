@@ -77,8 +77,6 @@ void* connect_client(void *socket) {
 			if((recv(client_sock, buffer, BUFFSIZE, 0)) == -1)
 				throw "Failed to receive data from the client.";
 
-				std::cout << buffer << "\n";
-
 			std::string command, client_input(buffer);
 			unsigned int i = 0;
 
@@ -203,7 +201,7 @@ void* connect_client(void *socket) {
 					// remove from hash table
 					pthread_mutex_lock(&hashTableLock);
 					globalTable.erase(tempcid);
-					pthread_mutex_lock(&hashTableLock);
+					pthread_mutex_unlock(&hashTableLock);
 					break;
 
 				case 3://put

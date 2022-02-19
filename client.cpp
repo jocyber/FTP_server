@@ -282,15 +282,6 @@ void handleGetCommand(const int &sockfd, const std::string &input) {
 
 		bytesLeft -= bytesReceived;
 	}
-	// int recv_size;
-	// while(true) {
-	// 	memset(output, '\0', BUFFSIZE);
-
-	// 	if((recv_size = recv(sockfd, output, BUFFSIZE, 0)) > 1)
-	// 		std::cout << output;
-	// 	else
-	// 		break;
-	// }
 
 	if(close(fd) == -1)
 		throw "Failed to close the file.";

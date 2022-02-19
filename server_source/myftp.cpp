@@ -57,18 +57,18 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 	int bytesSent = 0;
 	char buffer[BUFFSIZE];
 
-	// while(bytesSent < fileSize) {
-	// 	int bytesRead = read(fd, buffer, BUFFSIZE);
+	while(bytesSent < fileSize) {
+		int bytesRead = read(fd, buffer, BUFFSIZE);
 
-	// 	if(send(client_sock, buffer, bytesRead, 0) == -1)
-	// 		throw "Failed to send 'ls' message to client.\n";
+		if(send(client_sock, buffer, bytesRead, 0) == -1)
+			throw "Failed to send 'ls' message to client.\n";
 
-	// 	bytesSent += bytesRead;
-	// }
-
+		bytesSent += bytesRead;
+	}
+/*
 	if(sendfile(client_sock, fd, 0, sb.st_size) == -1)
 		throw "Failed to send file contents.\n";
-
+*/
 	if(close(fd) == -1)
 		throw "Failed to close the file.\n";
 }
