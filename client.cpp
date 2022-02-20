@@ -144,6 +144,7 @@ int main(int argc, char **argv) {
 							if(status != 0) {
 								throw "Unable to create thread.\n";
 							}
+							usleep(100000); // give time for prompt to get to the next line
 						} else {
 							handlePutCommand(sockfd, input);
 						}
@@ -183,15 +184,16 @@ int main(int argc, char **argv) {
 						// send terminate command to tport
 						std::string cidString = input.substr(10, input.length() - 10);
 						unsigned int cidInput = atoi(cidString.c_str());
-						std::cout <<"Terminating...\n";
+						std::cout <<"Terminating...\n\n";
+
+						// send terminate command to server
 						if(send(sockfd2, &cidInput, sizeof(cidInput), 0) == -1)
 							throw "Failed to send the cid to the server.";
 
-						// clean up get/put command
-						pthread_cancel(tid);
-
-						std::string commandType = prevInput.substr(0,4);
-						if(commandType.compare("get")) {
+						std::string commandType = prevInput.substr(0,3);
+						if(commandType.compare("get") == 0) {
+							// clean up get/put command
+							pthread_cancel(tid);
 							std::string prevFile = prevInput.substr(4, input.length() - 2);
 
 							// clear buffer
@@ -200,11 +202,15 @@ int main(int argc, char **argv) {
 							for(int i = 0; i < 100; i++) {
 								recv(sockfd, output, BUFFSIZE, 0);
 							}
+							// set socket back to blocking
 							int oldfl = fcntl(sockfd, F_GETFL);
 							fcntl(sockfd, F_SETFL, oldfl & ~O_NONBLOCK); // unset
 
 							// remove file
 							remove(prevFile.c_str());
+						} else {
+							sleep(1); // need to wait one second on put to make sure the server dosen't get blocked on reading
+							pthread_cancel(tid);
 						}
 
 						break;
@@ -251,6 +257,7 @@ void *handlePutBackground(void* arg) {
 	try {
 		char *temp = (char*)arg;
 		std::string inputText(temp);
+		inputText = inputText.substr(0, inputText.length() -2);
 		handlePutCommand(sockfd, inputText);
 	} catch(const char* hello) {
 		std::cerr << hello << "\n";
@@ -278,7 +285,7 @@ void handleGetCommand(const int &sockfd, const std::string &input) {
 	// get cid
 	if(recv(sockfd, &cid, sizeof(cid), 0) == -1)
 		throw "Failed to receive data from the server.";
-	std::cout << "Get executed with cid of " << cid << "\n";
+	std::cout << "Get executed with cid of " << cid << "\n\n";
 
 	// check if file exists on server
 	char fileMessage[100];
@@ -318,7 +325,7 @@ void handleGetCommand(const int &sockfd, const std::string &input) {
 
 //upload file to server
 void handlePutCommand(const int &sockfd, const std::string &input) {
-	std::string fileName = input.substr(4, input.length() - 2);
+	std::string fileName = input.substr(4, input.length());
 
 	// check to make sure file exists on the computer					
 	FILE* fp;
@@ -330,6 +337,11 @@ void handlePutCommand(const int &sockfd, const std::string &input) {
 	//send the file name
 	if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
 		throw "Failed to send the file name to the server.";
+
+	// get cid
+	if(recv(sockfd, &cid, sizeof(cid), 0) == -1)
+		throw "Failed to receive data from the server.";
+	std::cout << "Put executed with cid of " << cid << "\n\n";
 
 	// check to make sure file dosen't exist on server
 	char fileMessage[100];
@@ -351,8 +363,22 @@ void handlePutCommand(const int &sockfd, const std::string &input) {
 	if(send(sockfd, &fileSize, sizeof(int), 0) == -1)
 		throw "Failed to send file's metadata.";
 
+	int bytesSent = 0;
+	char buffer[BUFFSIZE];
+	while(bytesSent < fileSize) {
+		int bytesRead = read(fd, buffer, BUFFSIZE);
+		if(send(sockfd, buffer, bytesRead, 0) == -1)
+			throw "Failed to send 'ls' message to client.\n";
+
+		bytesSent += bytesRead;
+		sleep(1);
+	}
+	
+
+/*
 	if(sendfile(sockfd, fd, 0, sb.st_size) == -1)
 		throw "Failed to send file's contents.";
+*/
 
 	if(close(fd) == -1)
 		throw "Failed to close the file.";

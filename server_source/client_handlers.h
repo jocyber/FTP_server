@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include "myftp.h"
 
-inline unsigned int commandID = 0;
+inline unsigned int commandID = 1;
 inline pthread_mutex_t commandID_lock;
 inline pthread_mutex_t hashTableLock;
 inline std::unordered_map<unsigned int, bool> globalTable;

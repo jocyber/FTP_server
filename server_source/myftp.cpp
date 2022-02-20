@@ -56,7 +56,6 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 
 	int bytesSent = 0;
 	char buffer[BUFFSIZE];
-
 	while(bytesSent < fileSize) {
 		int bytesRead = read(fd, buffer, BUFFSIZE);
 
@@ -78,6 +77,24 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 }
 
 void putFile(const std::string &filename, const int &client_sock, unsigned int cid) {
+	//check if file already exists
+	FILE *fp;
+
+	if((fp = fopen(filename.c_str(), "r")) != NULL) {
+		char existsMsg[] = "File already exists on server.\n";
+		fclose(fp);
+
+		if(send(client_sock, existsMsg, sizeof(existsMsg), 0) == -1)
+			throw "Failed to send error message to client.\n";
+
+		return;
+	}
+	else {
+		char fileSuccess[] = "file does not exist";
+		if(send(client_sock, fileSuccess, sizeof(fileSuccess), 0) == -1)
+			throw "Failed to send success message to client.\n";
+	}
+
 	int fd = open(filename.c_str(), O_WRONLY | O_CREAT, 0666);
 	char output[BUFFSIZE];
 
@@ -98,8 +115,18 @@ void putFile(const std::string &filename, const int &client_sock, unsigned int c
 
 		if((bytesRecieved = recv(client_sock, output, BUFFSIZE, 0)) == -1)
 			throw "Failed to receive data from the client.\n";
-		if(write(fd, output, bytesRecieved) != bytesRecieved)
-			throw "Write error to file.\n";
+		if(bytesRecieved > 0) {
+			if(write(fd, output, bytesRecieved) != bytesRecieved)
+				throw "Write error to file.\n";
+		}
+		
+		// if terminated, stop reading
+		if(globalTable[cid]) {
+			//std::cout << "Server is stopping reading\n";
+			// remove file
+			remove(filename.c_str());
+			break;
+		}
 
 		bytesLeft -= bytesRecieved;
 	}

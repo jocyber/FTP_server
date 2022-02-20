@@ -30,19 +30,23 @@ void* handle_termination(void* port) {
 		exitFailure("Could not set up a passive socket connection in termination thread.");
 
 	unsigned int cid;
-	while(true) {
-		int client_sock;
+	int client_sock;
 
-		if((client_sock = accept(sockfd, NULL, NULL)) == -1) {
+	if((client_sock = accept(sockfd, NULL, NULL)) == -1) {
 			std::cerr << "Check shit.\n";
-			continue;
-		}
+	}
+	while(true) {
 
-		recv(client_sock, &cid, sizeof(cid), 0);
-		//std::cout << "Terminating: " << cid << "\n";
-		pthread_mutex_lock(&hashTableLock);
-		globalTable[commandID] = true;
-		pthread_mutex_unlock(&hashTableLock);
+		// if cid is 0, it will recv 0 when client connects and disconnects, needs to start at 1
+		if( recv(client_sock, &cid, sizeof(cid), 0) == 0 ) {
+			pthread_exit(0);
+		}
+		if(cid > 0) {
+			std::cout << "Terminating Process: " << cid << "\n";
+			pthread_mutex_lock(&hashTableLock);
+			globalTable[cid] = true;
+			pthread_mutex_unlock(&hashTableLock);
+		}
 
 	}
 

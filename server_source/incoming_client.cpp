@@ -69,6 +69,7 @@ void* connect_client(void *socket) {
 	char buffer[BUFFSIZE];
 	char message[BUFFSIZE];
 	bool stop = false; // flag for exit
+	unsigned int tempcid;
 
 	while(true) {
 		//handle exceptions by throwing messages and network errors
@@ -76,7 +77,7 @@ void* connect_client(void *socket) {
 			//receive input from the client
 			if((recv(client_sock, buffer, BUFFSIZE, 0)) == -1)
 				throw "Failed to receive data from the client.";
-std::cout << buffer << "\n";
+
 			std::string command, client_input(buffer);
 			unsigned int i = 0;
 
@@ -180,23 +181,23 @@ std::cout << buffer << "\n";
 					break;
 
 				case 2://get
-					unsigned int tempcid;
-					// send commandID to client
+					// get comand id
 					pthread_mutex_lock(&commandID_lock);
+					tempcid = commandID;
+					commandID++;
+					pthread_mutex_unlock(&commandID_lock);
 					
 					// add to hash table
 					pthread_mutex_lock(&hashTableLock);
-					globalTable[commandID] = false;
+					globalTable[tempcid] = false;
 					pthread_mutex_unlock(&hashTableLock);
 
-					if(send(client_sock, &commandID, sizeof(commandID), 0) == -1)
+					// send command id to client
+					if(send(client_sock, &tempcid, sizeof(tempcid), 0) == -1)
 						throw "Failed to send error msg to client.\n";
 
-					getFile(client_input, client_sock, commandID); // upload file to client
-					commandID++;
-					pthread_mutex_unlock(&commandID_lock);
-
-					getFile(client_input, client_sock, tempcid); // upload file to client
+					// upload file to client
+					getFile(client_input, client_sock, tempcid);
 
 					// remove from hash table
 					pthread_mutex_lock(&hashTableLock);
@@ -205,25 +206,28 @@ std::cout << buffer << "\n";
 					break;
 
 				case 3://put
-					//check if file already exists
-					FILE *fp;
+					// get comand id
+					pthread_mutex_lock(&commandID_lock);
+					tempcid = commandID;
+					commandID++;
+					pthread_mutex_unlock(&commandID_lock);
+					
+					// add to hash table
+					pthread_mutex_lock(&hashTableLock);
+					globalTable[tempcid] = false;
+					pthread_mutex_unlock(&hashTableLock);
 
-					if((fp = fopen(client_input.c_str(), "r")) != NULL) {
-						char existsMsg[] = "File already exists on server.\n";
-						fclose(fp);
+					// send command id to client
+					if(send(client_sock, &tempcid, sizeof(tempcid), 0) == -1)
+						throw "Failed to send error msg to client.\n";
 
-						if(send(client_sock, existsMsg, sizeof(existsMsg), 0) == -1)
-							throw "Failed to send error message to client.\n";
+					//download file from client
+					putFile(client_input, client_sock, tempcid);
 
-						break;
-					}
-					else {
-						char fileSuccess[] = "file does not exist";
-						if(send(client_sock, fileSuccess, sizeof(fileSuccess), 0) == -1)
-							throw "Failed to send success message to client.\n";
-					}
-
-					putFile(client_input, client_sock, commandID);//download file from client
+					// remove from hash table
+					pthread_mutex_lock(&hashTableLock);
+					globalTable.erase(tempcid);
+					pthread_mutex_unlock(&hashTableLock);
 					break;
 
 				default:
