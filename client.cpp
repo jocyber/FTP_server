@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
 	int option;
 	//define signal handler for the kill signal(Cntl-C)
 	signal(SIGINT, handler);//handler is a function pointer
-	std::string prevFile;
+	std::string prevInput;
 
 	while(true) {
 		try {
@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
 
 				bool isBackground = false;
 				if(input[input.length() - 1] == '&') {
-					prevFile = input.substr(4, input.length() - 6);
+					prevInput = input;
 					isBackground = true;
 				}
 
@@ -187,20 +187,25 @@ int main(int argc, char **argv) {
 						if(send(sockfd2, &cidInput, sizeof(cidInput), 0) == -1)
 							throw "Failed to send the cid to the server.";
 
-						// clean up get command
+						// clean up get/put command
 						pthread_cancel(tid);
 
-						// clear buffer
-						sleep(1); // need time to wait for server to stop sending to empty the buffer
-						fcntl(sockfd, F_SETFL, O_NONBLOCK); // set socket to non blocking
-						for(int i = 0; i < 100; i++) {
-							recv(sockfd, output, BUFFSIZE, 0);
-						}
-						int oldfl = fcntl(sockfd, F_GETFL);
-						fcntl(sockfd, F_SETFL, oldfl & ~O_NONBLOCK); // unset
+						std::string commandType = prevInput.substr(0,4);
+						if(commandType.compare("get")) {
+							std::string prevFile = prevInput.substr(4, input.length() - 2);
 
-						// remove file
-						remove(prevFile.c_str());
+							// clear buffer
+							sleep(1); // need time to wait for server to stop sending to empty the buffer
+							fcntl(sockfd, F_SETFL, O_NONBLOCK); // set socket to non blocking
+							for(int i = 0; i < 100; i++) {
+								recv(sockfd, output, BUFFSIZE, 0);
+							}
+							int oldfl = fcntl(sockfd, F_GETFL);
+							fcntl(sockfd, F_SETFL, oldfl & ~O_NONBLOCK); // unset
+
+							// remove file
+							remove(prevFile.c_str());
+						}
 
 						break;
 					}
