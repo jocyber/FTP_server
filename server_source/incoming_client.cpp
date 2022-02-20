@@ -76,7 +76,7 @@ void* connect_client(void *socket) {
 			//receive input from the client
 			if((recv(client_sock, buffer, BUFFSIZE, 0)) == -1)
 				throw "Failed to receive data from the client.";
-
+std::cout << buffer << "\n";
 			std::string command, client_input(buffer);
 			unsigned int i = 0;
 
@@ -86,7 +86,7 @@ void* connect_client(void *socket) {
 	
 			//client_input now becomes the argument
 			if(client_input[client_input.length() - 1] == '&') {
-				client_input = client_input.substr(i + 1, client_input.length() - 1 - i);
+				client_input = client_input.substr(i + 1, client_input.length() - 3 - i);
 			} else {
 				if(command.length() != client_input.length())
 					client_input = client_input.substr(i + 1, client_input.length());	

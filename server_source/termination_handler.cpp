@@ -39,6 +39,7 @@ void* handle_termination(void* port) {
 		}
 
 		recv(client_sock, &cid, sizeof(cid), 0);
+		//std::cout << "Terminating: " << cid << "\n";
 		pthread_mutex_lock(&hashTableLock);
 		globalTable[commandID] = true;
 		pthread_mutex_unlock(&hashTableLock);

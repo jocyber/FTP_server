@@ -63,7 +63,11 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 		if(send(client_sock, buffer, bytesRead, 0) == -1)
 			throw "Failed to send 'ls' message to client.\n";
 
+		if(globalTable[cid]) {
+			break;
+		}
 		bytesSent += bytesRead;
+		sleep(1);
 	}
 /*
 	if(sendfile(client_sock, fd, 0, sb.st_size) == -1)

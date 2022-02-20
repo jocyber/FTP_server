@@ -19,6 +19,8 @@
 //socket file descriptor
 //needs to be global so signal handler can access it
 int sockfd, sockfd2;
+unsigned int cid;
+pthread_t tid;
 
 //string to int mappings
 std::unordered_map<std::string, int> code = {
@@ -87,6 +89,7 @@ int main(int argc, char **argv) {
 	int option;
 	//define signal handler for the kill signal(Cntl-C)
 	signal(SIGINT, handler);//handler is a function pointer
+	std::string prevFile;
 
 	while(true) {
 		try {
@@ -113,7 +116,7 @@ int main(int argc, char **argv) {
 
 				bool isBackground = false;
 				if(input[input.length() - 1] == '&') {
-					//input = input.substr(0,input.length() - 2);
+					prevFile = input.substr(4, input.length() - 6);
 					isBackground = true;
 				}
 
@@ -121,13 +124,13 @@ int main(int argc, char **argv) {
 				switch(option) {
 					case 2: {//get
 						if(isBackground) {
-							pthread_t tid;
 							char temp[BUFFSIZE];
 							strcpy(temp, input.c_str());
 							int status = pthread_create(&tid, NULL, handleGetBackground, temp);
 							if(status != 0) {
 								throw "Unable to create thread.\n";
 							}
+							usleep(100000); // give time for prompt to get to the next line
 						} else {
 							handleGetCommand(sockfd, input);
 						}
@@ -135,7 +138,6 @@ int main(int argc, char **argv) {
 					}
 					case 3: {//put
 						if(isBackground) {
-							pthread_t tid;
 							char temp[BUFFSIZE];
 							strcpy(temp, input.c_str());
 							int status = pthread_create(&tid, NULL, handlePutBackground, temp);
@@ -178,6 +180,28 @@ int main(int argc, char **argv) {
 					}	
 
 					case 9: { // terminate
+						// send terminate command to tport
+						std::string cidString = input.substr(10, input.length() - 10);
+						unsigned int cidInput = atoi(cidString.c_str());
+						std::cout <<"Terminating...\n";
+						if(send(sockfd2, &cidInput, sizeof(cidInput), 0) == -1)
+							throw "Failed to send the cid to the server.";
+
+						// clean up get command
+						pthread_cancel(tid);
+
+						// clear buffer
+						sleep(1); // need time to wait for server to stop sending to empty the buffer
+						fcntl(sockfd, F_SETFL, O_NONBLOCK); // set socket to non blocking
+						for(int i = 0; i < 100; i++) {
+							recv(sockfd, output, BUFFSIZE, 0);
+						}
+						int oldfl = fcntl(sockfd, F_GETFL);
+						fcntl(sockfd, F_SETFL, oldfl & ~O_NONBLOCK); // unset
+
+						// remove file
+						remove(prevFile.c_str());
+
 						break;
 					}
 
@@ -210,6 +234,7 @@ void *handleGetBackground(void* arg) {
 	try {
 		char *temp = (char*)arg;
 		std::string inputText(temp);
+		inputText = inputText.substr(0, inputText.length() -2);
 		handleGetCommand(sockfd, inputText);
 	} catch(const char* hello) {
 		std::cerr << hello << "\n";
@@ -231,7 +256,7 @@ void *handlePutBackground(void* arg) {
 //download file from server
 void handleGetCommand(const int &sockfd, const std::string &input) {
 	//check for files existence
-	std::string file = input.substr(4, input.length() - 2);
+	std::string file = input.substr(4, input.length());
 
 	// check if the file already exists in current directory
 	FILE* fp;
@@ -246,7 +271,6 @@ void handleGetCommand(const int &sockfd, const std::string &input) {
 		throw "Failed to send the file for 'get' to the server.";
 
 	// get cid
-	unsigned int cid;
 	if(recv(sockfd, &cid, sizeof(cid), 0) == -1)
 		throw "Failed to receive data from the server.";
 	std::cout << "Get executed with cid of " << cid << "\n";
