@@ -93,10 +93,9 @@ void* connect_client(void *socket) {
 					client_input = client_input.substr(i + 1, client_input.length());	
 			}
 
-			int option;
-			if(code.find(command) == code.end())// if command is not valid
-				option = -1;
-			else
+			int option = -1;
+
+			if(code.find(command) != code.end())// if command is valid
 				option = code[command];
 
 			//general logic for the ftp server starts here
@@ -149,19 +148,43 @@ void* connect_client(void *socket) {
 					stop = true; // set flag to true and end ftp session
 					break;
 
-				case 4: // delete
+				case 4: {// delete
 					//remove file or empty directory
-					if(remove(const_cast<char*>(client_input.c_str())) == -1) {
+					int fd = open(client_input.c_str(), O_RDONLY);
+
+					if(fd == -1) {
 						client_input = "File: {" + client_input + "} does not exist.\n";
 						
-						if(send(client_sock, client_input.c_str(), client_input.length(), 0) == -1)
+						if(send(client_sock, client_input.c_str(), client_input.length(), 0) == -1) {
+							close(fd);
 							throw "Failed to send error message for 'delete'.\n";
+						}
 					}
-					else
-						if(send(client_sock, message, BUFFSIZE, 0) == -1)
+					else {
+						if(flock(fd, LOCK_EX) == -1) {
+							close(fd);
+							throw "Failed to place lock on file descriptor for 'delete' command.";
+						}
+
+						//remove the file
+						remove(const_cast<char*>(client_input.c_str()));
+
+						//send successfull packet back to the client
+						if(send(client_sock, message, BUFFSIZE, 0) == -1) {
+							close(fd);
 							throw "Failed to send 'delete' response to client.\n";
+						}
+
+						if(flock(fd, LOCK_UN) == -1) {
+							close(fd);
+							throw "Failed unlock the file for 'delete' command.";
+						}
+					}
+
+					close(fd);
 
 					break;
+				}
 
 				case 8://mkdir
 					//make directory with read and write permissions
@@ -181,7 +204,7 @@ void* connect_client(void *socket) {
 					break;
 
 				case 2://get
-					// get comand id
+					// get command id
 					pthread_mutex_lock(&commandID_lock);
 					tempcid = commandID;
 					commandID++;

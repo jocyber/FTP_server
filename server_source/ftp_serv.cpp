@@ -15,8 +15,8 @@ int main(int argc, char **argv)
 {
 	// get port number from command line
 	if(argc != 3) {
-		std::cerr << "Incorrect format. exe {server port} {terminate port}";
-		return 1;
+		std::cerr << "Incorrect format. exe {server port} {terminate port}\n";
+		return EXIT_FAILURE;
 	}
 
 	pthread_mutex_init(&commandID_lock, NULL);

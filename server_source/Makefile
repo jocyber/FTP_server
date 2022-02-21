@@ -12,10 +12,10 @@ run: $(EXE) $(HEADER)
 	g++ $(FLAGS) $^ -o $(SERVER)
 
 $(HEADER): $(CLIENT).cpp
-	g++ $(FLAGS) $< -o server_source/$@
+	g++ $(FLAGS) $< -o $@
 
 clean:
-	rm $(SERVER) server_source/$(HEADER)
+	rm $(SERVER) $(HEADER)
 
 memleak:
 	valgrind --leak-check=full ./$(SERVER)

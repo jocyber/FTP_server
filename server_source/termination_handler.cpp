@@ -32,22 +32,21 @@ void* handle_termination(void* port) {
 	unsigned int cid;
 	int client_sock;
 
-	if((client_sock = accept(sockfd, NULL, NULL)) == -1) {
-			std::cerr << "Check shit.\n";
-	}
-	while(true) {
+	if((client_sock = accept(sockfd, NULL, NULL)) == -1)
+		std::cerr << "Check shit.\n";
 
+	while(true) {
 		// if cid is 0, it will recv 0 when client connects and disconnects, needs to start at 1
-		if( recv(client_sock, &cid, sizeof(cid), 0) == 0 ) {
-			pthread_exit(0);
-		}
+		if(recv(client_sock, &cid, sizeof(cid), 0) == 0)
+			pthread_exit(EXIT_SUCCESS);
+
 		if(cid > 0) {
 			std::cout << "Terminating Process: " << cid << "\n";
+			
 			pthread_mutex_lock(&hashTableLock);
 			globalTable[cid] = true;
 			pthread_mutex_unlock(&hashTableLock);
 		}
-
 	}
 
     pthread_exit(0); //just here for now to avoid compiler warnings
