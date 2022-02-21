@@ -42,7 +42,7 @@ void* handle_termination(void* port) {
 		if(cid > 0) {
 			std::cout << "Terminating Process: " << cid << "\n";
 
-			pthread_mutex_lock(&hashTableLock);
+			while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
 			globalTable[cid] = true;
 			pthread_mutex_unlock(&hashTableLock);
 		}

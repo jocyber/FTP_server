@@ -3,16 +3,16 @@ EXE := ftp_serv
 HEADER := myftp
 CLIENT := client
 SERVER := myftpserver
-nPORT := 2273
-tPORT := 2276
+nPORT := 7273
+tPORT := 7276
 
 run: $(EXE) $(HEADER)
 
 %: server_source/%.cpp server_source/*.cpp
 	g++ $(FLAGS) $^ -o $(SERVER)
 
-$(HEADER): $(CLIENT).cpp
-	g++ $(FLAGS) $< -o server_source/$@
+$(HEADER): ./*.cpp
+	g++ $(FLAGS) $^ -o server_source/$@
 
 clean:
 	rm $(SERVER) server_source/$(HEADER)

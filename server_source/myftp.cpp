@@ -63,6 +63,7 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 	int bytesSent = 0;
 	char buffer[BUFFSIZE];
 	
+	//take in data from the socket
 	while(bytesSent < fileSize) {
 		int bytesRead = read(fd, buffer, BUFFSIZE);
 
