@@ -44,7 +44,7 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 	}
 
 	//place a lock on the open file.
-	if(flock(fd, LOCK_EX) == -1) {//lock_ex is an exclusive lock
+	if(flock(fd, LOCK_SH) == -1) {//lock_sh is a shared lock for read-only files
 		close(fd);
 		throw "Failed to place a lock on the file upon 'get' command.";
 	}
@@ -73,7 +73,7 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 			break;
 		
 		bytesSent += bytesRead;
-		sleep(1);//temporary for testing purposes
+		//sleep(1);//temporary for testing purposes
 	}
 
 	//unlock the file
@@ -124,15 +124,15 @@ void putFile(const std::string &filename, const int &client_sock, unsigned int c
 	
 	//keep reciving data until there's none left
 	int bytesLeft = fileSize;
-	int bytesRecieved;
+	int bytesReceived;
 
 	while(bytesLeft > 0) {
 		memset(output, 0, BUFFSIZE);
 
-		if((bytesRecieved = recv(client_sock, output, BUFFSIZE, 0)) == -1)
+		if((bytesReceived = recv(client_sock, output, BUFFSIZE, 0)) == -1)
 			throw "Failed to receive data from the client.\n";
-		if(bytesRecieved > 0) {
-			if(write(fd, output, bytesRecieved) != bytesRecieved)
+		if(bytesReceived > 0) {
+			if(write(fd, output, bytesReceived) != bytesReceived)
 				throw "Write error to file.\n";
 		}
 		
@@ -142,7 +142,7 @@ void putFile(const std::string &filename, const int &client_sock, unsigned int c
 			break;
 		}
 
-		bytesLeft -= bytesRecieved;
+		bytesLeft -= bytesReceived;
 	}
 
 	//unlock the file with flock

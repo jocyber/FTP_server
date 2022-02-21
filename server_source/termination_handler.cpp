@@ -6,7 +6,6 @@ void* handle_termination(void* port) {
     //create the socket and binding, then wait for a termination command
 
     int sockfd;
-    // client_sock;
 
 	//AF_INET = IPv4
 	//SOCK_STREAM = TCP
@@ -22,7 +21,7 @@ void* handle_termination(void* port) {
 	addr.sin_addr.s_addr = INADDR_ANY;
 
 	if(bind(sockfd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
-		exitFailure("Could not bind the socket to an address.");
+		exitFailure("Could not bind the socket to an address for tPORT.");
 
 	//listen for oncoming connections
 	//SOMAXCONN = socket maximum connections
@@ -42,7 +41,7 @@ void* handle_termination(void* port) {
 
 		if(cid > 0) {
 			std::cout << "Terminating Process: " << cid << "\n";
-			
+
 			pthread_mutex_lock(&hashTableLock);
 			globalTable[cid] = true;
 			pthread_mutex_unlock(&hashTableLock);

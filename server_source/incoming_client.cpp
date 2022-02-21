@@ -29,7 +29,7 @@ void* handle_client(void* port) {
 	addr.sin_addr.s_addr = INADDR_ANY;
 
 	if(bind(sockfd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
-		exitFailure("Could not bind the socket to an address.");
+		exitFailure("Could not bind the socket to an address for nPORT");
 
 	//listen for oncoming connections
 	//SOMAXCONN = socket maximum connections
@@ -205,13 +205,14 @@ void* connect_client(void *socket) {
 
 				case 2://get
 					// get command id
-					pthread_mutex_lock(&commandID_lock);
+					//avoid deadlock situation
+					while(pthread_mutex_trylock(&commandID_lock) == EBUSY) {;}
 					tempcid = commandID;
 					commandID++;
 					pthread_mutex_unlock(&commandID_lock);
 					
 					// add to hash table
-					pthread_mutex_lock(&hashTableLock);
+					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
 					globalTable[tempcid] = false;
 					pthread_mutex_unlock(&hashTableLock);
 
@@ -223,20 +224,20 @@ void* connect_client(void *socket) {
 					getFile(client_input, client_sock, tempcid);
 
 					// remove from hash table
-					pthread_mutex_lock(&hashTableLock);
+					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
 					globalTable.erase(tempcid);
 					pthread_mutex_unlock(&hashTableLock);
 					break;
 
 				case 3://put
 					// get comand id
-					pthread_mutex_lock(&commandID_lock);
+					while(pthread_mutex_trylock(&commandID_lock) == EBUSY) {;}
 					tempcid = commandID;
 					commandID++;
 					pthread_mutex_unlock(&commandID_lock);
 					
 					// add to hash table
-					pthread_mutex_lock(&hashTableLock);
+					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
 					globalTable[tempcid] = false;
 					pthread_mutex_unlock(&hashTableLock);
 
@@ -248,7 +249,7 @@ void* connect_client(void *socket) {
 					putFile(client_input, client_sock, tempcid);
 
 					// remove from hash table
-					pthread_mutex_lock(&hashTableLock);
+					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
 					globalTable.erase(tempcid);
 					pthread_mutex_unlock(&hashTableLock);
 					break;
@@ -259,7 +260,7 @@ void* connect_client(void *socket) {
 						throw "Failed to send 'input not recognized' to client.\n";
 			}
 		}
-		catch(char *message) {
+		catch(const char *message) {
 			std::cerr << message;
 		}
 		catch(Network_Error &message) {//for catastrophic network errors

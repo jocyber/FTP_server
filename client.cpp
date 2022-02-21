@@ -27,7 +27,7 @@ std::unordered_map<std::string, int> code = {
 	{"quit", 1}, {"get", 2}, {"put", 3}, {"delete", 4}, {"ls", 5}, 
 	{"pwd", 6}, {"cd", 7}, {"mkdir", 8}, {"terminate", 9} };
 
-//function prototypes
+//function prototypes/signatures
 void errexit(const std::string message);
 void handleGetCommand(const int &sockfd, const std::string &input);
 void handlePutCommand(const int &sockfd, const std::string &input);
@@ -40,7 +40,7 @@ void handler(int num) {
 	send(sockfd, signal_message, sizeof(signal_message), 0);
 
 	printf("\n");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int main(int argc, char **argv) {
@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
 	addr.sin_addr.s_addr = inet_addr(domainIP);
 
 	char output[BUFFSIZE] = "";
-	std::string input;
+	std::string input, prevInput;
 
 	if((connect(sockfd, (struct sockaddr*) &addr, sizeof(addr))) == -1)
 		errexit("Could not connect to nport.");
@@ -86,10 +86,8 @@ int main(int argc, char **argv) {
 	if((connect(sockfd2, (struct sockaddr*) &addr, sizeof(addr))) == -1)
 		errexit("Could not connect to tport.");
 
-	int option;
 	//define signal handler for the kill signal(Cntl-C)
 	signal(SIGINT, handler);//handler is a function pointer
-	std::string prevInput;
 
 	while(true) {
 		try {
@@ -109,9 +107,9 @@ int main(int argc, char **argv) {
 				for(unsigned int i = 0; input[i] != ' ' && i < input.length(); ++i)
 					req += input[i];
 
-				if(code.find(req) == code.end())
-					option = -1;
-				else
+				int option = -1;
+
+				if(code.find(req) != code.end())
 					option = code[req];
 
 				bool isBackground = false;
@@ -133,9 +131,10 @@ int main(int argc, char **argv) {
 								throw "Unable to create thread.\n";
 							}
 							usleep(100000); // give time for prompt to get to the next line
-						} else {
+						} 
+						else
 							handleGetCommand(sockfd, input);
-						}
+
 						break;
 					}
 					case 3: {//put
@@ -149,13 +148,15 @@ int main(int argc, char **argv) {
 								throw "Unable to create thread.\n";
 							}
 							usleep(100000); // give time for prompt to get to the next line
-						} else {
+						} 
+						else
 							handlePutCommand(sockfd, input);
-						}
+						
 						break;
 					}
 					case 1: {//quit
 						char quit_mess[] = "quit";
+						
 						if(send(sockfd, quit_mess, sizeof(quit_mess), 0) == -1)
 							throw "Failed to send the input to the server.";
 
@@ -297,7 +298,7 @@ void handleGetCommand(const int &sockfd, const std::string &input) {
 	if(recv(sockfd, &cid, sizeof(cid), 0) == -1)
 		throw "Failed to receive data from the server.";
 
-	std::cout << "Get executed with cid of " << cid << "\n\n";
+	std::cout << "Get executed with cid of " << cid << "\n";
 
 	// check if file exists on server
 	char fileMessage[100];
@@ -341,8 +342,8 @@ void handlePutCommand(const int &sockfd, const std::string &input) {
 	std::string fileName = input.substr(4, input.length());
 
 	// check to make sure file exists on the computer					
-	FILE* fp;
-	fp = fopen(fileName.c_str(), "r");
+	FILE* fp = fopen(fileName.c_str(), "r");
+
 	if(fp == NULL)
 		throw "File does not exist in current directory.\n";
 
@@ -354,7 +355,8 @@ void handlePutCommand(const int &sockfd, const std::string &input) {
 	// get cid
 	if(recv(sockfd, &cid, sizeof(cid), 0) == -1)
 		throw "Failed to receive data from the server.";
-	std::cout << "Put executed with cid of " << cid << "\n\n";
+
+	std::cout << "Put executed with cid of " << cid << "\n";
 
 	// check to make sure file dosen't exist on server
 	char fileMessage[100];
@@ -374,18 +376,19 @@ void handlePutCommand(const int &sockfd, const std::string &input) {
 	//send file size to server
 	int fileSize = sb.st_size;
 	if(send(sockfd, &fileSize, sizeof(int), 0) == -1)
-		throw "Failed to send file's metadata.";
+		throw "Failed to send files metadata.";
 
 	int bytesSent = 0;
 	char buffer[BUFFSIZE];
 
 	while(bytesSent < fileSize) {
 		int bytesRead = read(fd, buffer, BUFFSIZE);
+
 		if(send(sockfd, buffer, bytesRead, 0) == -1)
 			throw "Failed to send 'ls' message to client.\n";
 
 		bytesSent += bytesRead;
-		sleep(1);
+		//sleep(1);
 	}
 
 	if(close(fd) == -1)
