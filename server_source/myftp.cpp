@@ -44,7 +44,7 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 	}
 
 	//place a lock on the open file.
-	if(flock(fd, LOCK_SH) == -1) {//lock_sh is a shared lock for read-only files
+	if(flock(fd, LOCK_EX) == -1) {//lock_ex is an exclusive lock
 		close(fd);
 		throw "Failed to place a lock on the file upon 'get' command.";
 	}
@@ -87,7 +87,7 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 		throw "Failed to close the file.\n";
 }
 
-void putFile(const std::string &filename, const int &client_sock, unsigned int cid) {
+void putFile(const std::string &filename, int client_sock, unsigned int cid) {
 	//check if file already exists
 	FILE *fp;
 
@@ -107,7 +107,6 @@ void putFile(const std::string &filename, const int &client_sock, unsigned int c
 	}
 
 	int fd = open(filename.c_str(), O_WRONLY | O_CREAT, 0666);
-	char output[BUFFSIZE];
 
 	if(fd == -1) 
 		throw "Failed to open file.\n";
@@ -126,7 +125,10 @@ void putFile(const std::string &filename, const int &client_sock, unsigned int c
 	//keep reciving data until there's none left
 	int bytesLeft = fileSize;
 	int bytesReceived;
+	bool remove_file = false;
+	char output[BUFFSIZE];
 
+	//receive data from the client
 	while(bytesLeft > 0) {
 		memset(output, 0, BUFFSIZE);
 
@@ -137,15 +139,13 @@ void putFile(const std::string &filename, const int &client_sock, unsigned int c
 				throw "Write error to file.\n";
 		}
 		
-		// if terminated, stop reading
-		if(globalTable[cid]) {
-			remove(const_cast<char*>(filename.c_str()));
-			break;
-		}
-
 		bytesLeft -= bytesReceived;
+		// if terminated, stop reading
+		if(globalTable[cid])
+			remove_file = true;
 	}
 
+	/********* clean up *********/
 	//unlock the file with flock
 	if(flock(fd, LOCK_UN) == -1) {
 		close(fd);
@@ -154,4 +154,7 @@ void putFile(const std::string &filename, const int &client_sock, unsigned int c
 
 	if(close(fd) == -1)
 		throw "Failed to close the file.\n";
+
+	if(remove_file)
+		remove(filename.c_str());
 }

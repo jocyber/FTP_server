@@ -100,6 +100,7 @@ void handleGetCommand(const int &sockfd, const std::string &input) {
 
 //upload file to server
 void handlePutCommand(const int &sockfd, const std::string &input) {
+	done_sending = false;
 	std::string fileName = input.substr(4, input.length());
 
 	// check to make sure file exists on the computer					
@@ -154,8 +155,11 @@ void handlePutCommand(const int &sockfd, const std::string &input) {
 
 	if(close(fd) == -1)
 		throw "Failed to close the file.";
+
+	done_sending = true;
 }
 
+//signal handler
 void handler(int num) {
 	char signal_message[] = "quit_signal";
 	send(sockfd, signal_message, sizeof(signal_message), 0);

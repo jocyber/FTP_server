@@ -19,7 +19,7 @@ int main(int argc, char **argv) {
 	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 		errexit("Failed to create a socket.");
 
-	if((sockfd2 = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+	if((terminate_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 		errexit("Failed to create a socket.");
 
 	struct sockaddr_in addr;
@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
 		errexit("Could not connect to nport.");
 
 	addr.sin_port = htons(t_port_num);//network byte ordering of port number		
-	if((connect(sockfd2, (struct sockaddr*) &addr, sizeof(addr))) == -1)
+	if((connect(terminate_sock, (struct sockaddr*) &addr, sizeof(addr))) == -1)
 		errexit("Could not connect to tport.");
 
 	//define signal handler for the kill signal(Cntl-C)
@@ -118,7 +118,10 @@ int main(int argc, char **argv) {
 							throw "Failed to send the input to the server.";
 
 						if(close(sockfd) == -1)
-							errexit("Failed to close the socket.");
+							errexit("Failed to close the normal socket.");
+						
+						if(close(terminate_sock) == -1)
+							errexit("Failed to close the terminate socket.");
 
 						return EXIT_SUCCESS;
 					}
@@ -149,18 +152,15 @@ int main(int argc, char **argv) {
 						std::cout << "Terminating...\n\n";
 
 						// send terminate command to server
-						if(send(sockfd2, &cidInput, sizeof(cidInput), 0) == -1)
+						if(send(terminate_sock, &cidInput, sizeof(cidInput), 0) == -1)
 							throw "Failed to send the cid to the server.";
 
-						std::string commandType;
-
-						for(unsigned int i = 0; prevInput[i] != ' ' && i < prevInput.length(); ++i)
-							commandType += prevInput[i];
+						std::string commandType = prevInput.substr(0, 3);
 
 						if(commandType.compare("get") == 0) {
 							// clean up get/put command
 							pthread_cancel(tid);
-							std::string prevFile = prevInput.substr(4, input.length() - 2);
+							std::string prevFile = prevInput.substr(4, input.length() - 6);
 
 							// clear buffer
 							sleep(1); // need time to wait for server to stop sending to empty the buffer
@@ -175,10 +175,9 @@ int main(int argc, char **argv) {
 
 							// remove file
 							remove(prevFile.c_str());
-						} 
+						}
 						else {
-							sleep(1); // need to wait one second on put to make sure the server dosen't get blocked on reading
-							pthread_cancel(tid);
+							while(!done_sending) {std::cout << "";}//wait for the thread to finish sending data over the socket so it's not blocked afterwards
 						}
 
 						break;

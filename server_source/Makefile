@@ -9,13 +9,13 @@ tPORT := 7276
 run: $(EXE) $(HEADER)
 
 %: server_source/%.cpp server_source/*.cpp
-	g++ $(FLAGS) $^ -o $(SERVER)
+	g++ $(FLAGS) $^ -o server_source/$(SERVER)
 
-$(HEADER): $(CLIENT).cpp
-	g++ $(FLAGS) $< -o $@
+$(HEADER): ./*.cpp
+	g++ $(FLAGS) $^ -o $@
 
 clean:
-	rm $(SERVER) $(HEADER)
+	rm $(HEADER) server_source/$(SERVER)
 
 memleak:
 	valgrind --leak-check=full ./$(SERVER)

@@ -21,9 +21,11 @@
 #define BUFFSIZE 1000
 //socket file descriptor
 //needs to be global so signal handler can access it
-inline int sockfd, sockfd2;
+inline int sockfd, terminate_sock;
 inline unsigned int cid;
 inline pthread_t tid;
+
+inline bool done_sending = true;
 
 //string to int mappings
 inline std::unordered_map<std::string, int> code = {
