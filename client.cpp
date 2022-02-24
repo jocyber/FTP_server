@@ -162,21 +162,13 @@ int main(int argc, char **argv) {
 					}
 
 					case 5: { // ls
-						int recv_size;
-						
-						if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
-							throw "Failed to send the input to the server.";
-
-						while(true) {
-							memset(output, '\0', BUFFSIZE);
-
-							if((recv_size = recv(sockfd, output, BUFFSIZE, 0)) > 1)
-								std::cout << output;
-							else
-								break;
-						}
-
+					  if(send(sockfd, input.c_str(), input.length(), 0) == -1) 
+               throw "Cannot send the command to server";
+            if(recv(sockfd, output, BUFFSIZE, 0) == -1)
+							throw "Failed to receive data from the server.";
+            std::cout << output;
 						std::cout << '\n';
+            memset(output, '\0', BUFFSIZE);
 						break;
 					}	
 
@@ -199,7 +191,7 @@ int main(int argc, char **argv) {
 							// clear buffer
 							sleep(1); // need time to wait for server to stop sending to empty the buffer
 							fcntl(sockfd, F_SETFL, O_NONBLOCK); // set socket to non blocking
-							for(int i = 0; i < 100; i++) {
+							for(int i = 0; i < 1000; i++) {
 								recv(sockfd, output, BUFFSIZE, 0);
 							}
 							// set socket back to blocking
@@ -303,9 +295,10 @@ void handleGetCommand(const int &sockfd, const std::string &input) {
 	int fileSize;
 	if(recv(sockfd, &fileSize, sizeof(int), 0) == -1)
 		throw "Failed to receive data from the server.";
-	
+
 	//keep reciving data until there's none left
-	int bytesReceived = 0, bytesLeft = fileSize;
+	ssize_t bytesReceived = 0;
+  ssize_t bytesLeft = fileSize;
 	char output[BUFFSIZE];
 
 	while(bytesLeft > 0) {
@@ -313,14 +306,22 @@ void handleGetCommand(const int &sockfd, const std::string &input) {
 
 		if((bytesReceived = recv(sockfd, output, BUFFSIZE, 0)) == -1)
 			 throw "Failed to receive data from the server.";
-		if(write(fd, output, bytesReceived) != bytesReceived)
-			throw "Write error to file.";
 
+    if(bytesReceived > 0) {
+		  if(write(fd, output, bytesReceived) != bytesReceived)
+			  throw "Write error to file.";
+    }
+    
 		bytesLeft -= bytesReceived;
+   
+    if(bytesLeft == 0) {
+      break;
+    }
 	}
 
-	if(close(fd) == -1)
+	if(close(fd) == -1) {
 		throw "Failed to close the file.";
+  }
 }
 
 //upload file to server

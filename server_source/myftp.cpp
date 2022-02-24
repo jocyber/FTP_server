@@ -10,24 +10,25 @@
 
 //read the current directory
 void listDirectories(const int &client_sock) {
-	FILE *fd = popen("ls", "r");
+  char path[] = "./";
+	char space[] = "\n";
+  char message[BUFFSIZE];
+  memset(message, '\0', BUFFSIZE);
 
-	if(fd == NULL)
-		throw "Failed to execute 'ls' on the command-line.";
+	DIR *direct = opendir(path);
+	struct dirent *dirP;	
 
-	char buffer[BUFFSIZE];
-	while(fgets(buffer, BUFFSIZE, fd) != NULL) {
-		if(send(client_sock, buffer, BUFFSIZE, 0) == -1)
-			throw "Failed to send 'ls' message to client.\n";
+	while((dirP = readdir(direct)) != NULL) {
+		if(strcmp(dirP->d_name, ".") == 0 || strcmp(dirP->d_name, "..") == 0)
+			continue;
 
-		memset(buffer, '\0', sizeof(buffer));
+		strcat(message, dirP->d_name);
+		strcat(message, space);
 	}
 
-	fclose(fd);
-
-	char temp[] = "";
-	if(send(client_sock, temp, sizeof(temp), 0) == -1)
-		throw "Failed to send 'ls' message to client.\n";
+ if(send(client_sock, message, sizeof(message), 0) == -1) 
+   throw "Can't send ls to client";
+   
 }
 
 //send file to the client
@@ -56,6 +57,7 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 
 	int bytesSent = 0;
 	char buffer[BUFFSIZE];
+
 	while(bytesSent < fileSize) {
 		int bytesRead = read(fd, buffer, BUFFSIZE);
 
@@ -68,6 +70,7 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 		bytesSent += bytesRead;
 		sleep(1);
 	}
+
 /*
 	if(sendfile(client_sock, fd, 0, sb.st_size) == -1)
 		throw "Failed to send file contents.\n";
@@ -80,7 +83,7 @@ void putFile(const std::string &filename, const int &client_sock, unsigned int c
 	//check if file already exists
 	FILE *fp;
 
-	if((fp = fopen(filename.c_str(), "r")) != NULL) {
+	if((fp = fopen(filename.c_str(), "r+")) != NULL) {
 		char existsMsg[] = "File already exists on server.\n";
 		fclose(fp);
 
