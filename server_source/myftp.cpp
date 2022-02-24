@@ -16,6 +16,7 @@ void listDirectories(const int &client_sock) {
 		throw "Failed to execute 'ls' on the command-line.";
 
 	char buffer[BUFFSIZE];
+
 	while(fgets(buffer, BUFFSIZE, fd) != NULL) {
 		if(send(client_sock, buffer, BUFFSIZE, 0) == -1)
 			throw "Failed to send 'ls' message to client.\n";
@@ -53,28 +54,19 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 	if(send(client_sock, successMsg, sizeof(successMsg), 0) == -1)
 			throw "Failed to send error msg to client.\n";
 
-	struct stat sb;
-	fstat(fd, &sb);
-	// send file size
-	int fileSize = sb.st_size;
-	if(send(client_sock, &fileSize, sizeof(int), 0) == -1)
-		throw "Failed to send the file size.\n";
-
-	int bytesSent = 0;
+	//int bytesSent = 0;
 	char buffer[BUFFSIZE];
-	
-	//take in data from the socket
-	while(bytesSent < fileSize) {
-		int bytesRead = read(fd, buffer, BUFFSIZE);
 
-		if(send(client_sock, buffer, bytesRead, 0) == -1)
-			throw "Failed to send 'ls' message to client.\n";
+	ssize_t numRead;
+	//put data into the socket
+	while((numRead = read(fd, buffer, BUFFSIZE)) > 0) {
+		if(write(client_sock, buffer, numRead) != numRead)
+			throw "Failed to send 'get' content to client.\n";
 
-		if(globalTable[cid])
+		if(globalTable[cid]) {
+			std::cout << "broke from send loop\n";
 			break;
-		
-		bytesSent += bytesRead;
-		//sleep(1);//temporary for testing purposes
+		}
 	}
 
 	//unlock the file
@@ -87,24 +79,8 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 		throw "Failed to close the file.\n";
 }
 
+//code for the put command
 void putFile(const std::string &filename, int client_sock, unsigned int cid) {
-	//check if file already exists
-	FILE *fp;
-
-	if((fp = fopen(filename.c_str(), "r")) != NULL) {
-		char existsMsg[] = "File already exists on server.\n";
-		fclose(fp);
-
-		if(send(client_sock, existsMsg, sizeof(existsMsg), 0) == -1)
-			throw "Failed to send error message to client.\n";
-
-		return;
-	}
-	else {
-		char fileSuccess[] = "file does not exist";
-		if(send(client_sock, fileSuccess, sizeof(fileSuccess), 0) == -1)
-			throw "Failed to send success message to client.\n";
-	}
 
 	int fd = open(filename.c_str(), O_WRONLY | O_CREAT, 0666);
 
@@ -116,31 +92,17 @@ void putFile(const std::string &filename, int client_sock, unsigned int cid) {
 		close(fd);
 		throw "Failed to place a lock on the file upon 'put' command.";
 	}
-
-	// get file Size from server
-	int fileSize;
-	if(recv(client_sock, &fileSize, sizeof(int), 0) == -1)
-		throw "Failed to receive data from the client.\n";
 	
-	//keep reciving data until there's none left
-	int bytesLeft = fileSize;
-	int bytesReceived;
+	//keep receiving data until there's none left
 	bool remove_file = false;
 	char output[BUFFSIZE];
 
-	//receive data from the client
-	while(bytesLeft > 0) {
-		memset(output, 0, BUFFSIZE);
+	//recieve data from the socket
+	ssize_t numRead;
+	while((numRead = read(client_sock, output, BUFFSIZE)) > 0) {
+		if(write(fd, output, numRead) != numRead)
+			throw "Failed to write data to the file.";
 
-		if((bytesReceived = recv(client_sock, output, BUFFSIZE, 0)) == -1)
-			throw "Failed to receive data from the client.\n";
-		if(bytesReceived > 0) {
-			if(write(fd, output, bytesReceived) != bytesReceived)
-				throw "Write error to file.\n";
-		}
-		
-		bytesLeft -= bytesReceived;
-		// if terminated, stop reading
 		if(globalTable[cid])
 			remove_file = true;
 	}

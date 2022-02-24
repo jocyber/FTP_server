@@ -84,9 +84,9 @@ int main(int argc, char **argv) {
 
 							int status = pthread_create(&tid, NULL, handleGetBackground, temp);
 
-							if(status != 0) {
+							if(status != 0)
 								throw "Unable to create thread.\n";
-							}
+							
 							usleep(100000); // give time for prompt to get to the next line
 						} 
 						else
@@ -132,13 +132,9 @@ int main(int argc, char **argv) {
 						if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
 							throw "Failed to send the input to the server.";
 
-						while(true) {
+						while((recv_size = read(sockfd, output, BUFFSIZE)) > 0) {
+							std::cout << output;
 							memset(output, '\0', BUFFSIZE);
-
-							if((recv_size = recv(sockfd, output, BUFFSIZE, 0)) > 1)
-								std::cout << output;
-							else
-								break;
 						}
 
 						std::cout << '\n';

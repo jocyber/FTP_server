@@ -27,7 +27,7 @@ cli:
 	./$(HEADER) localhost $(nPORT) $(tPORT)
 
 move:
-	scp myftpserver jeh82014@odin.cs.uga.edu:~
+	scp server_source/myftpserver jeh82014@odin.cs.uga.edu:~
 
 commit:
 	./.commit.sh

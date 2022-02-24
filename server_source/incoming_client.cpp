@@ -204,15 +204,15 @@ void* connect_client(void *socket) {
 					break;
 
 				case 2://get
-					// get command id
+					//get command id
 					//avoid deadlock situation
-					while(pthread_mutex_trylock(&commandID_lock) == EBUSY) {std::cout << "";}
+					while(pthread_mutex_trylock(&commandID_lock) == EBUSY) {;}
 					tempcid = commandID;
 					commandID++;
 					pthread_mutex_unlock(&commandID_lock);
 					
 					// add to hash table
-					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {std::cout << "";}
+					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
 					globalTable[tempcid] = false;
 					pthread_mutex_unlock(&hashTableLock);
 
@@ -224,20 +224,21 @@ void* connect_client(void *socket) {
 					getFile(client_input, client_sock, tempcid);
 
 					// remove from hash table
-					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {std::cout << "";}
+					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
 					globalTable.erase(tempcid);
 					pthread_mutex_unlock(&hashTableLock);
+
 					break;
 
 				case 3://put
 					// get command id
-					while(pthread_mutex_trylock(&commandID_lock) == EBUSY) {std::cout << "";}
+					while(pthread_mutex_trylock(&commandID_lock) == EBUSY) {;}
 					tempcid = commandID;
 					commandID++;
 					pthread_mutex_unlock(&commandID_lock);
 					
 					// add to hash table
-					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {std::cout << "";}
+					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
 					globalTable[tempcid] = false;
 					pthread_mutex_unlock(&hashTableLock);
 
@@ -249,7 +250,7 @@ void* connect_client(void *socket) {
 					putFile(client_input, client_sock, tempcid);
 
 					// remove from hash table
-					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {std::cout << "";}
+					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
 					globalTable.erase(tempcid);
 					pthread_mutex_unlock(&hashTableLock);
 					break;

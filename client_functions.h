@@ -18,7 +18,7 @@
 #include <unordered_map>
 #include <pthread.h>
 
-#define BUFFSIZE 1000
+#define BUFFSIZE 100
 //socket file descriptor
 //needs to be global so signal handler can access it
 inline int sockfd, terminate_sock;
