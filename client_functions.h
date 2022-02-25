@@ -34,7 +34,7 @@ inline std::unordered_map<std::string, int> code = {
 
 //function prototypes/signatures
 void errexit(const std::string message);
-void handleGetCommand(const int &sockfd, const std::string &input);
+void handleGetCommand(int sockfd, const std::string &input);
 void handlePutCommand(const int &sockfd, const std::string &input);
 void *handleGetBackground(void* arg);
 void *handlePutBackground(void* arg);

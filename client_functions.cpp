@@ -36,7 +36,7 @@ void *handlePutBackground(void* arg) {
 }
 
 //download file from server
-void handleGetCommand(const int &sockfd, const std::string &input) {
+void handleGetCommand(int sockfd, const std::string &input) {
 	//check for files existence
 	std::string file = input.substr(4, input.length());
 
@@ -66,7 +66,7 @@ void handleGetCommand(const int &sockfd, const std::string &input) {
 	char output[BUFFSIZE];
 
 	ssize_t numRead;
-	while((numRead = read(sockfd, output, BUFFSIZE)) > 0) {
+	while((numRead = recv(sockfd, output, BUFFSIZE, 0)) > 0) {
 		if(write(fd, output, numRead) != numRead)
 			throw "Failed to write data to the file.";
 	}

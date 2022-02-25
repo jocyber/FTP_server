@@ -132,9 +132,13 @@ int main(int argc, char **argv) {
 						if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
 							throw "Failed to send the input to the server.";
 
-						while((recv_size = read(sockfd, output, BUFFSIZE)) > 0) {
-							std::cout << output;
+						while(true) {
 							memset(output, '\0', BUFFSIZE);
+
+							if((recv_size = recv(sockfd, output, BUFFSIZE, 0)) > 1)
+								std::cout << output;
+							else
+								break;
 						}
 
 						std::cout << '\n';

@@ -57,11 +57,11 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 	//int bytesSent = 0;
 	char buffer[BUFFSIZE];
 
-	ssize_t numRead;
-	//put data into the socket
-	while((numRead = read(fd, buffer, BUFFSIZE)) > 0) {
-		if(write(client_sock, buffer, numRead) != numRead)
-			throw "Failed to send 'get' content to client.\n";
+	ssize_t recv_size;		
+
+	while((recv_size = read(fd, buffer, BUFFSIZE)) > 0) {
+		if(send(client_sock, buffer, recv_size, 0) != recv_size)
+			throw "Error in receiving data from the socket.";
 
 		if(globalTable[cid]) {
 			std::cout << "broke from send loop\n";
@@ -103,8 +103,8 @@ void putFile(const std::string &filename, int client_sock, unsigned int cid) {
 		if(write(fd, output, numRead) != numRead)
 			throw "Failed to write data to the file.";
 
-		if(globalTable[cid])
-			remove_file = true;
+		// if(globalTable[cid])
+		// 	remove_file = true;
 	}
 
 	/********* clean up *********/
