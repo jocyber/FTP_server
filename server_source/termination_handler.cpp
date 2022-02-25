@@ -1,4 +1,8 @@
 #include "client_handlers.h"
+#include <signal.h>
+
+void* handle_terminate(void* sock);
+void handler(int signal);
 
 //listen for the 'terminate' command
 void* handle_termination(void* port) {
@@ -28,11 +32,28 @@ void* handle_termination(void* port) {
 	if(listen(sockfd, SOMAXCONN) == -1)
 		exitFailure("Could not set up a passive socket connection in termination thread.");
 
-	unsigned int cid;
 	int client_sock;
+	pthread_t tid;
 
-	if((client_sock = accept(sockfd, NULL, NULL)) == -1)
-		std::cerr << "Check shit.\n";
+	while(true) {
+		if((client_sock = accept(sockfd, NULL, NULL)) == -1)
+			std::cerr << "Check shit.\n";
+
+		int	thStatus = pthread_create(&tid, NULL, handle_terminate, &client_sock);
+
+		if(thStatus != 0) {
+			std::cerr << "Thread in terminate failed.";
+			break;
+		}
+	}
+
+    pthread_exit(0); //just here for now to avoid compiler warnings
+}
+
+void* handle_terminate(void* sock) {
+	int client_sock = *(int*) sock;
+	unsigned int cid;
+	signal(SIGPIPE, handler);
 
 	while(true) {
 		// if cid is 0, it will recv 0 when client connects and disconnects, needs to start at 1
@@ -40,11 +61,19 @@ void* handle_termination(void* port) {
 			pthread_exit(EXIT_SUCCESS);
 
 		if(cid > 0) {
-			while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
+			pthread_mutex_lock(&hashTableLock);
 			globalTable[cid] = true;
 			pthread_mutex_unlock(&hashTableLock);
 		}
-	}
 
-    pthread_exit(0); //just here for now to avoid compiler warnings
+		char ACK[4] = "ACK";
+		if(send(client_sock, ACK, sizeof(ACK), 0) == -1) {
+			std::cerr << "Failed to send ACK message.\n";
+			continue;
+		}
+	}
+}
+
+void handler(int signal) {
+	pthread_exit(0);
 }

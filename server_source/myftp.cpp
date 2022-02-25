@@ -16,19 +16,18 @@ void listDirectories(const int &client_sock) {
 		throw "Failed to execute 'ls' on the command-line.";
 
 	char buffer[BUFFSIZE];
+	memset(buffer, '\0', BUFFSIZE);
 
 	while(fgets(buffer, BUFFSIZE, fd) != NULL) {
-		if(send(client_sock, buffer, BUFFSIZE, 0) == -1)
+		if(send(client_sock, buffer, strlen(buffer), 0) == -1)
 			throw "Failed to send 'ls' message to client.\n";
-
-		memset(buffer, '\0', sizeof(buffer));
 	}
 
 	fclose(fd);
 
-	char temp[] = "";
-	if(send(client_sock, temp, sizeof(temp), 0) == -1)
-		throw "Failed to send 'ls' message to client.\n";
+	// char temp[] = "";
+	// if(send(client_sock, temp, sizeof(temp), 0) == -1)
+	// 	throw "Failed to send 'ls' message to client.\n";
 }
 
 //send file to the client
@@ -56,17 +55,20 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 
 	//int bytesSent = 0;
 	char buffer[BUFFSIZE];
+	memset(buffer, '\0', BUFFSIZE);
 
 	ssize_t recv_size;		
 
 	while((recv_size = read(fd, buffer, BUFFSIZE)) > 0) {
+		if(globalTable[cid]) {
+			memset(buffer, '\0', BUFFSIZE);
+			break;
+		}
+
 		if(send(client_sock, buffer, recv_size, 0) != recv_size)
 			throw "Error in receiving data from the socket.";
 
-		if(globalTable[cid]) {
-			std::cout << "broke from send loop\n";
-			break;
-		}
+		//sleep(1);
 	}
 
 	//unlock the file
@@ -81,9 +83,7 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 
 //code for the put command
 void putFile(const std::string &filename, int client_sock, unsigned int cid) {
-
 	int fd = open(filename.c_str(), O_WRONLY | O_CREAT, 0666);
-
 	if(fd == -1) 
 		throw "Failed to open file.\n";
 
@@ -96,6 +96,7 @@ void putFile(const std::string &filename, int client_sock, unsigned int cid) {
 	//keep receiving data until there's none left
 	bool remove_file = false;
 	char output[BUFFSIZE];
+	memset(output, '\0', BUFFSIZE);
 
 	//recieve data from the socket
 	ssize_t numRead;
@@ -103,8 +104,15 @@ void putFile(const std::string &filename, int client_sock, unsigned int cid) {
 		if(write(fd, output, numRead) != numRead)
 			throw "Failed to write data to the file.";
 
-		// if(globalTable[cid])
-		// 	remove_file = true;
+		if(globalTable[cid]) {
+			remove_file = true;
+			break;
+		}
+
+		if(numRead < BUFFSIZE)
+			break;
+
+		//sleep(1);
 	}
 
 	/********* clean up *********/
@@ -117,6 +125,22 @@ void putFile(const std::string &filename, int client_sock, unsigned int cid) {
 	if(close(fd) == -1)
 		throw "Failed to close the file.\n";
 
-	if(remove_file)
+	if(remove_file) {
 		remove(filename.c_str());
+
+		//clear out socket
+		char tempBuff[BUFFSIZE];
+		memset(tempBuff, '\0', BUFFSIZE);
+		//non-blocking recieve to clear out remaining data in socket
+
+		fcntl(client_sock, F_SETFL, O_NONBLOCK); // set socket to non blocking
+		for(int i = 0; i < 5; i++) {
+			//sleep(1);
+			recv(client_sock, tempBuff, BUFFSIZE, 0); 
+		}
+	
+		// set socket back to blocking
+		int oldfl = fcntl(client_sock, F_GETFL);
+		fcntl(client_sock, F_SETFL, oldfl & ~O_NONBLOCK); // unset
+	}
 }

@@ -18,14 +18,14 @@
 #include <unordered_map>
 #include <pthread.h>
 
-#define BUFFSIZE 100
+#define BUFFSIZE 1000
 //socket file descriptor
 //needs to be global so signal handler can access it
 inline int sockfd, terminate_sock;
-inline unsigned int cid;
+inline int cid;
 inline pthread_t tid;
 
-inline bool done_sending = true;
+inline bool done_sending = false, isDone = true;
 
 //string to int mappings
 inline std::unordered_map<std::string, int> code = {

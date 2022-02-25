@@ -33,7 +33,6 @@ int main(int argc, char **argv) {
 	addr.sin_port = htons(port_num);//network byte ordering of port number
 	addr.sin_addr.s_addr = inet_addr(domainIP);
 
-	char output[BUFFSIZE] = "";
 	std::string input, prevInput;
 
 	if((connect(sockfd, (struct sockaddr*) &addr, sizeof(addr))) == -1)
@@ -49,10 +48,26 @@ int main(int argc, char **argv) {
 	while(true) {
 		try {
 			input.clear();//O(1)
-			memset(output, '\0', BUFFSIZE);//clear array (fastest standard way)
+
+			//clear out socket
+			char tempBuff[BUFFSIZE];
+			memset(tempBuff, '\0', BUFFSIZE);
+			//non-blocking recieve to clear out remaining data in socket
+
+			fcntl(sockfd, F_SETFL, O_NONBLOCK); // set socket to non blocking
+			for(int i = 0; i < 5; i++) {
+				//sleep(1);
+				recv(sockfd, tempBuff, BUFFSIZE, 0);
+			}
+		
+			// set socket back to blocking
+			int oldfl = fcntl(sockfd, F_GETFL);
+			fcntl(sockfd, F_SETFL, oldfl & ~O_NONBLOCK); // unset
+
 			std::cout << "myftp> ";
 
 			std::getline(std::cin, input);
+			//done_sending = false;
 
 			//guard against buffer overflow
 			if(input.length() > BUFFSIZE)
@@ -80,6 +95,8 @@ int main(int argc, char **argv) {
 					case 2: {//get
 						if(isBackground) {
 							char temp[BUFFSIZE];
+							memset(temp, '\0', BUFFSIZE);
+							
 							strcpy(temp, input.c_str());
 
 							int status = pthread_create(&tid, NULL, handleGetBackground, temp);
@@ -97,6 +114,8 @@ int main(int argc, char **argv) {
 					case 3: {//put
 						if(isBackground) {
 							char temp[BUFFSIZE];
+							memset(temp, '\0', BUFFSIZE);
+
 							strcpy(temp, input.c_str());
 
 							int status = pthread_create(&tid, NULL, handlePutBackground, temp);
@@ -127,18 +146,20 @@ int main(int argc, char **argv) {
 					}
 
 					case 5: { //ls
-						int recv_size;
-						
 						if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
 							throw "Failed to send the input to the server.";
 
-						while(true) {
-							memset(output, '\0', BUFFSIZE);
+						char output_mess[BUFFSIZE];
+						memset(output_mess, '\0', BUFFSIZE);
 
-							if((recv_size = recv(sockfd, output, BUFFSIZE, 0)) > 1)
-								std::cout << output;
-							else
+						ssize_t numRead;
+						while((numRead = recv(sockfd, output_mess, BUFFSIZE, 0)) > 0) {
+							std::cout << output_mess;
+
+							if(numRead < BUFFSIZE) {
+								done_sending = false;
 								break;
+							}
 						}
 
 						std::cout << '\n';
@@ -147,37 +168,22 @@ int main(int argc, char **argv) {
 
 					case 9: { // terminate
 						// send terminate command to tport
-						std::string cidString = input.substr(10, input.length());
-						unsigned int cidInput = atoi(cidString.c_str());
-						std::cout << "Terminating...\n\n";
+						if(!isDone) {
+							int cidInput = (int)(input[input.length() - 1] - '0');
+							std::cout << "Terminating...\n\n";
 
-						// send terminate command to server
-						if(send(terminate_sock, &cidInput, sizeof(cidInput), 0) == -1)
-							throw "Failed to send the cid to the server.";
+							// send terminate command to server
+							if(send(terminate_sock, &cidInput, sizeof(cidInput), 0) == -1)
+								throw "Failed to send the cid to the server.";
 
-						std::string commandType = prevInput.substr(0, 3);
+							char ACK[4];
+							memset(ACK, '\0', sizeof(ACK));
 
-						if(commandType.compare("get") == 0) {
-							// clean up get/put command
-							pthread_cancel(tid);
-							std::string prevFile = prevInput.substr(4, input.length() - 6);
+							if(recv(terminate_sock, ACK, sizeof(ACK), 0) == -1)
+								throw "Failed to recieve Acknowledgement from the termination port";
 
-							// clear buffer
-							sleep(1); // need time to wait for server to stop sending to empty the buffer
-							fcntl(sockfd, F_SETFL, O_NONBLOCK); // set socket to non blocking
-
-							for(int i = 0; i < 100; i++)
-								recv(sockfd, output, BUFFSIZE, 0);
-							
-							// set socket back to blocking
-							int oldfl = fcntl(sockfd, F_GETFL);
-							fcntl(sockfd, F_SETFL, oldfl & ~O_NONBLOCK); // unset
-
-							// remove file
-							remove(prevFile.c_str());
-						}
-						else {
-							while(!done_sending) {std::cout << "";}//wait for the thread to finish sending data over the socket so it's not blocked afterwards
+							//std::string commandType = prevInput.substr(0, 3);
+							done_sending = true;
 						}
 
 						break;
@@ -186,6 +192,12 @@ int main(int argc, char **argv) {
 					default:
 						if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
 							throw "Failed to send the input to the server.";
+
+						if(send(terminate_sock, input.c_str(), BUFFSIZE, 0) == -1)
+							throw "Failed to send the input to the server.";
+
+						char output[BUFFSIZE];
+						memset(output, '\0', BUFFSIZE);
 
 						if(recv(sockfd, output, BUFFSIZE, 0) == -1)
 							throw "Failed to receive data from the server.";

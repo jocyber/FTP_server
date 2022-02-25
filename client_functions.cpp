@@ -8,6 +8,7 @@ void errexit(const std::string message) {
 void *handleGetBackground(void* arg) {
 	try {
 		char *temp = (char*)arg;
+		isDone = false;
 		
 		std::string inputText(temp);
 		inputText = inputText.substr(0, inputText.length() - 2);
@@ -23,6 +24,7 @@ void *handleGetBackground(void* arg) {
 void *handlePutBackground(void* arg) {
 	try {
 		char *temp = (char*)arg;
+		isDone = false;
 
 		std::string inputText(temp);
 		inputText = inputText.substr(0, inputText.length() - 2);
@@ -38,7 +40,7 @@ void *handlePutBackground(void* arg) {
 //download file from server
 void handleGetCommand(int sockfd, const std::string &input) {
 	//check for files existence
-	std::string file = input.substr(4, input.length());
+	const std::string file = input.substr(4, input.length());
 
 	if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
 		throw "Failed to send the file for 'get' to the server.";
@@ -64,20 +66,41 @@ void handleGetCommand(int sockfd, const std::string &input) {
 	
 	//keep receiving data until there's none left
 	char output[BUFFSIZE];
+	memset(output, '\0', BUFFSIZE);
 
 	ssize_t numRead;
 	while((numRead = recv(sockfd, output, BUFFSIZE, 0)) > 0) {
 		if(write(fd, output, numRead) != numRead)
 			throw "Failed to write data to the file.";
+
+		if(numRead < BUFFSIZE) {
+			if(done_sending)
+				remove(file.c_str());
+
+			done_sending = false;
+			break;
+		}
+
+		if(done_sending) {
+			done_sending = false;
+			isDone = true;
+			close(fd);
+
+			remove(file.c_str());
+			pthread_exit((void*)EXIT_FAILURE);
+		}
+
+		//sleep(1);
 	}
 
 	if(close(fd) == -1)
 		throw "Failed to close the file.";
+
+	isDone = true;
 }
 
 //upload file to server
 void handlePutCommand(const int &sockfd, const std::string &input) {
-	done_sending = false;
 	int fd;
 	std::string fileName = input.substr(4, input.length());
 				
@@ -95,17 +118,29 @@ void handlePutCommand(const int &sockfd, const std::string &input) {
 	std::cout << "Put executed with cid of " << cid << "\n";
 
 	char buffer[BUFFSIZE];
+	memset(buffer, '\0', BUFFSIZE);
+
 	ssize_t numRead;
 	//put data into the socket
 	while((numRead = read(fd, buffer, BUFFSIZE)) > 0) {
 		if(write(sockfd, buffer, numRead) != numRead)
 			throw "Failed to send 'get' content to client.\n";
+
+		if(done_sending) {
+			done_sending = false;
+			close(fd);
+
+			isDone = true;
+			pthread_exit((void*)EXIT_FAILURE);
+		}
+
+		//sleep(1);
 	}
 	
 	if(close(fd) == -1)
 		throw "Failed to close the file.";
-
-	done_sending = true;
+	
+	isDone = true;
 }
 
 //signal handler

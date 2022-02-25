@@ -1,7 +1,8 @@
 #include "client_handlers.h"
+#include <atomic>
 
-//resitrict the number of connections
-unsigned int numConnections = 0;
+//restrict the number of connections
+static std::atomic<int> numConnections = 0;
 
 void* connect_client(void* socket);
 
@@ -69,7 +70,7 @@ void* connect_client(void *socket) {
 	char buffer[BUFFSIZE];
 	char message[BUFFSIZE];
 	bool stop = false; // flag for exit
-	unsigned int tempcid;
+	int tempcid;
 
 	while(true) {
 		//handle exceptions by throwing messages and network errors
@@ -206,13 +207,13 @@ void* connect_client(void *socket) {
 				case 2://get
 					//get command id
 					//avoid deadlock situation
-					while(pthread_mutex_trylock(&commandID_lock) == EBUSY) {;}
+					pthread_mutex_lock(&commandID_lock);
 					tempcid = commandID;
 					commandID++;
 					pthread_mutex_unlock(&commandID_lock);
 					
 					// add to hash table
-					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
+					pthread_mutex_lock(&hashTableLock);
 					globalTable[tempcid] = false;
 					pthread_mutex_unlock(&hashTableLock);
 
@@ -224,7 +225,7 @@ void* connect_client(void *socket) {
 					getFile(client_input, client_sock, tempcid);
 
 					// remove from hash table
-					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
+					pthread_mutex_lock(&hashTableLock);
 					globalTable.erase(tempcid);
 					pthread_mutex_unlock(&hashTableLock);
 
@@ -232,13 +233,13 @@ void* connect_client(void *socket) {
 
 				case 3://put
 					// get command id
-					while(pthread_mutex_trylock(&commandID_lock) == EBUSY) {;}
+					pthread_mutex_lock(&commandID_lock);
 					tempcid = commandID;
 					commandID++;
 					pthread_mutex_unlock(&commandID_lock);
 					
 					// add to hash table
-					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
+					pthread_mutex_lock(&hashTableLock);
 					globalTable[tempcid] = false;
 					pthread_mutex_unlock(&hashTableLock);
 
@@ -250,7 +251,7 @@ void* connect_client(void *socket) {
 					putFile(client_input, client_sock, tempcid);
 
 					// remove from hash table
-					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
+					pthread_mutex_lock(&hashTableLock);
 					globalTable.erase(tempcid);
 					pthread_mutex_unlock(&hashTableLock);
 					break;
