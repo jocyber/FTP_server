@@ -12,7 +12,7 @@
 #include <exception>
 #include <unordered_map>
 
-#define BUFFSIZE 1000
+#define BUFFSIZE 100
 
 //custom exception for network errors
 class Network_Error : std::exception {
@@ -28,7 +28,7 @@ public:
 };
 
 void listDirectories(const int &client_sock);
-void getFile(const std::string &file, const int &client_sock);
-void putFile(const std::string &filename, const int &client_sock);
+void getFile(const std::string &file, const int &client_sock, unsigned int cid);
+void putFile(const std::string &filename, int client_sock, unsigned int cid);
 
 #endif

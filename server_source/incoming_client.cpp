@@ -1,38 +1,19 @@
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
-#include <pthread.h>
-#include "myftp.h"
+#include "client_handlers.h"
 
-// #define PORT 2000
-#define BUFFSIZE 1000
+//resitrict the number of connections
 unsigned int numConnections = 0;
+
+void* connect_client(void* socket);
 
 //map the strings to codes so the strings will work with a switch statement
 std::unordered_map<std::string, int> code = {
 	{"quit", 1}, {"get", 2}, {"put", 3}, {"delete", 4}, {"ls", 5}, 
 	{"pwd", 6}, {"cd", 7}, {"mkdir", 8}, {"quit_signal", 9} };
 
-//exit the program on critical error
-void exitFailure(const std::string str) {
-	std::cout << str << '\n';
-	exit(EXIT_FAILURE);
-}
-
-//function pointer to main logic
-void* handleClient(void *socket);
-
-int main(int argc, char **argv) 
-{
-	// get port number from command line
-	if(argc != 2) {
-		std::cerr << "Incorrect format.\n./server {port number}\n";
-		return 1;
-	}
-
-	unsigned short PORT = atoi(argv[1]);
-	int sockfd, client_sock;
+//handle the connections on the normal port
+void* handle_client(void* port) {
+    unsigned short nPORT = *(unsigned short*) port;
+    int sockfd, client_sock;
 
 	//AF_INET = IPv4
 	//SOCK_STREAM = TCP
@@ -44,11 +25,11 @@ int main(int argc, char **argv)
 	memset((struct sockaddr_in *) &addr, 0, sizeof(addr));
 
 	addr.sin_family = AF_INET; // IPv4
-	addr.sin_port = htons(PORT);//host to network short/uint16(network byte ordering)
+	addr.sin_port = htons(nPORT);//host to network short/uint16(network byte ordering)
 	addr.sin_addr.s_addr = INADDR_ANY;
 
 	if(bind(sockfd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
-		exitFailure("Could not bind the socket to an address.");
+		exitFailure("Could not bind the socket to an address for nPORT");
 
 	//listen for oncoming connections
 	//SOMAXCONN = socket maximum connections
@@ -74,7 +55,7 @@ int main(int argc, char **argv)
 
 		//create a thread and pass the handleClient function pointer and its parameter
 		//later, we should implement a thread pool for better performance
-		int	thStatus = pthread_create(&tid, NULL, handleClient, &client_sock);
+		int	thStatus = pthread_create(&tid, NULL, connect_client, &client_sock);
 		numConnections++;
 
 		if(thStatus != 0)
@@ -83,11 +64,12 @@ int main(int argc, char **argv)
 }
 
 //function to handle an individual client
-void* handleClient(void *socket) {
+void* connect_client(void *socket) {
 	int client_sock = *(int *) socket;
 	char buffer[BUFFSIZE];
 	char message[BUFFSIZE];
 	bool stop = false; // flag for exit
+	unsigned int tempcid;
 
 	while(true) {
 		//handle exceptions by throwing messages and network errors
@@ -104,13 +86,16 @@ void* handleClient(void *socket) {
 				command += client_input[i];
 	
 			//client_input now becomes the argument
-			if(command.length() != client_input.length())
-				client_input = client_input.substr(i + 1, client_input.length());	
+			if(client_input[client_input.length() - 1] == '&') {
+				client_input = client_input.substr(i + 1, client_input.length() - 3 - i);
+			} else {
+				if(command.length() != client_input.length())
+					client_input = client_input.substr(i + 1, client_input.length());	
+			}
 
-			int option;
-			if(code.find(command) == code.end())// if command is not valid
-				option = -1;
-			else
+			int option = -1;
+
+			if(code.find(command) != code.end())// if command is valid
 				option = code[command];
 
 			//general logic for the ftp server starts here
@@ -163,19 +148,43 @@ void* handleClient(void *socket) {
 					stop = true; // set flag to true and end ftp session
 					break;
 
-				case 4: // delete
+				case 4: {// delete
 					//remove file or empty directory
-					if(remove(const_cast<char*>(client_input.c_str())) == -1) {
+					int fd = open(client_input.c_str(), O_RDONLY);
+
+					if(fd == -1) {
 						client_input = "File: {" + client_input + "} does not exist.\n";
 						
-						if(send(client_sock, client_input.c_str(), client_input.length(), 0) == -1)
+						if(send(client_sock, client_input.c_str(), client_input.length(), 0) == -1) {
+							close(fd);
 							throw "Failed to send error message for 'delete'.\n";
+						}
 					}
-					else
-						if(send(client_sock, message, BUFFSIZE, 0) == -1)
+					else {
+						if(flock(fd, LOCK_EX) == -1) {
+							close(fd);
+							throw "Failed to place lock on file descriptor for 'delete' command.";
+						}
+
+						//remove the file
+						remove(const_cast<char*>(client_input.c_str()));
+
+						//send successfull packet back to the client
+						if(send(client_sock, message, BUFFSIZE, 0) == -1) {
+							close(fd);
 							throw "Failed to send 'delete' response to client.\n";
+						}
+
+						if(flock(fd, LOCK_UN) == -1) {
+							close(fd);
+							throw "Failed unlock the file for 'delete' command.";
+						}
+					}
+
+					close(fd);
 
 					break;
+				}
 
 				case 8://mkdir
 					//make directory with read and write permissions
@@ -195,30 +204,55 @@ void* handleClient(void *socket) {
 					break;
 
 				case 2://get
-					//endline to make parsing the packet easier
-					getFile(client_input, client_sock); // upload file to client
+					//get command id
+					//avoid deadlock situation
+					while(pthread_mutex_trylock(&commandID_lock) == EBUSY) {;}
+					tempcid = commandID;
+					commandID++;
+					pthread_mutex_unlock(&commandID_lock);
+					
+					// add to hash table
+					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
+					globalTable[tempcid] = false;
+					pthread_mutex_unlock(&hashTableLock);
+
+					// send command id to client
+					if(send(client_sock, &tempcid, sizeof(tempcid), 0) == -1)
+						throw "Failed to send error msg to client.\n";
+
+					// upload file to client
+					getFile(client_input, client_sock, tempcid);
+
+					// remove from hash table
+					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
+					globalTable.erase(tempcid);
+					pthread_mutex_unlock(&hashTableLock);
+
 					break;
 
 				case 3://put
-					//check if file already exists
-					FILE *fp;
+					// get command id
+					while(pthread_mutex_trylock(&commandID_lock) == EBUSY) {;}
+					tempcid = commandID;
+					commandID++;
+					pthread_mutex_unlock(&commandID_lock);
+					
+					// add to hash table
+					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
+					globalTable[tempcid] = false;
+					pthread_mutex_unlock(&hashTableLock);
 
-					if((fp = fopen(client_input.c_str(), "r")) != NULL) {
-						char existsMsg[] = "File already exists on server.\n";
-						fclose(fp);
+					// send command id to client
+					if(send(client_sock, &tempcid, sizeof(tempcid), 0) == -1)
+						throw "Failed to send error msg to client.\n";
 
-						if(send(client_sock, existsMsg, sizeof(existsMsg), 0) == -1)
-							throw "Failed to send error message to client.\n";
+					//download file from client
+					putFile(client_input, client_sock, tempcid);
 
-						break;
-					}
-					else {
-						char fileSuccess[] = "file does not exist";
-						if(send(client_sock, fileSuccess, sizeof(fileSuccess), 0) == -1)
-							throw "Failed to send success message to client.\n";
-					}
-
-					putFile(client_input, client_sock);//download file from client
+					// remove from hash table
+					while(pthread_mutex_trylock(&hashTableLock) == EBUSY) {;}
+					globalTable.erase(tempcid);
+					pthread_mutex_unlock(&hashTableLock);
 					break;
 
 				default:
@@ -227,7 +261,7 @@ void* handleClient(void *socket) {
 						throw "Failed to send 'input not recognized' to client.\n";
 			}
 		}
-		catch(char *message) {
+		catch(const char *message) {
 			std::cerr << message;
 		}
 		catch(Network_Error &message) {//for catastrophic network errors
@@ -247,4 +281,3 @@ void* handleClient(void *socket) {
 		memset(buffer, 0, BUFFSIZE);
 	}
 }
-
