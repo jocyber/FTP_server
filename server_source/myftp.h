@@ -29,6 +29,6 @@ public:
 
 void listDirectories(const int &client_sock);
 void getFile(const std::string &file, const int &client_sock, unsigned int cid);
-void putFile(const std::string &filename, const int &client_sock, unsigned int cid);
+void putFile(const std::string &filename, const int &client_sock, unsigned int cid, char buffer[], bool &commandAlreadyRecieved);
 
 #endif

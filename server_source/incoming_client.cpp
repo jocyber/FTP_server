@@ -70,13 +70,18 @@ void* connect_client(void *socket) {
 	char message[BUFFSIZE];
 	bool stop = false; // flag for exit
 	unsigned int tempcid;
+  bool commandAlreadyRecieved = false;
 
 	while(true) {
 		//handle exceptions by throwing messages and network errors
 		try {
 			//receive input from the client
-			if((recv(client_sock, buffer, BUFFSIZE, 0)) == -1)
-				throw "Failed to receive data from the client.";
+      if(!commandAlreadyRecieved) {
+			  if((recv(client_sock, buffer, BUFFSIZE, 0)) == -1)
+				  throw "Failed to receive data from the client.";
+      } else {
+        commandAlreadyRecieved = false;
+      }
 
 			std::string command, client_input(buffer);
 			unsigned int i = 0;
@@ -222,7 +227,7 @@ void* connect_client(void *socket) {
 						throw "Failed to send error msg to client.\n";
 
 					//download file from client
-					putFile(client_input, client_sock, tempcid);
+					putFile(client_input, client_sock, tempcid, buffer, commandAlreadyRecieved);
 
 					// remove from hash table
 					pthread_mutex_lock(&hashTableLock);
@@ -253,6 +258,7 @@ void* connect_client(void *socket) {
 			pthread_exit(EXIT_SUCCESS);
 
 		memset(message, 0, BUFFSIZE);
-		memset(buffer, 0, BUFFSIZE);
+    if(!commandAlreadyRecieved) 
+		  memset(buffer, 0, BUFFSIZE);
 	}
 }

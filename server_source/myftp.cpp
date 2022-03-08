@@ -7,6 +7,8 @@
 #include <sys/un.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
+#include <sys/file.h>
 
 //read the current directory
 void listDirectories(const int &client_sock) {
@@ -57,7 +59,8 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 
 	int bytesSent = 0;
 	char buffer[BUFFSIZE];
-
+  // create a shared lock on file
+  flock(fd, LOCK_SH);
 	while(bytesSent < fileSize) {
 		int bytesRead = read(fd, buffer, BUFFSIZE);
 
@@ -68,36 +71,17 @@ void getFile(const std::string &file, const int &client_sock, unsigned int cid) 
 			break;
 		}
 		bytesSent += bytesRead;
-		sleep(1);
+    usleep(10);
 	}
 
-/*
-	if(sendfile(client_sock, fd, 0, sb.st_size) == -1)
-		throw "Failed to send file contents.\n";
-*/
+  // remove shared lock
+  flock(fd, LOCK_UN);
 	if(close(fd) == -1)
 		throw "Failed to close the file.\n";
 }
 
-void putFile(const std::string &filename, const int &client_sock, unsigned int cid) {
-	//check if file already exists
-	FILE *fp;
-
-	if((fp = fopen(filename.c_str(), "r+")) != NULL) {
-		char existsMsg[] = "File already exists on server.\n";
-		fclose(fp);
-
-		if(send(client_sock, existsMsg, sizeof(existsMsg), 0) == -1)
-			throw "Failed to send error message to client.\n";
-
-		return;
-	}
-	else {
-		char fileSuccess[] = "file does not exist";
-		if(send(client_sock, fileSuccess, sizeof(fileSuccess), 0) == -1)
-			throw "Failed to send success message to client.\n";
-	}
-
+void putFile(const std::string &filename, const int &client_sock, unsigned int cid, char buffer[], bool &commandAlreadyRecieved) {
+  // create file
 	int fd = open(filename.c_str(), O_WRONLY | O_CREAT, 0666);
 	char output[BUFFSIZE];
 
@@ -109,10 +93,24 @@ void putFile(const std::string &filename, const int &client_sock, unsigned int c
 	if(recv(client_sock, &fileSize, sizeof(int), 0) == -1)
 		throw "Failed to receive data from the client.\n";
 	
-	//keep reciving data until there's none left
+	// keep reciving data until there's none left
 	int bytesLeft = fileSize;
 	int bytesRecieved;
-
+  // put an exclusive lock on the file
+  int lock;
+  bool waitedInLock = false;
+  while((lock = flock(fd, LOCK_EX | LOCK_NB)) == -1) {
+    waitedInLock = true;
+  }
+  if(waitedInLock) {
+    // delete file and reopen
+    if(close(fd) == -1)
+		  throw "Failed to close the file.\n";
+    remove(filename.c_str());
+    
+    fd = open(filename.c_str(), O_WRONLY | O_CREAT, 0666);
+  }
+  std::cout << "Lock " << pthread_self() << ": " << lock << "\n";
 	while(bytesLeft > 0) {
 		memset(output, 0, BUFFSIZE);
 
@@ -122,18 +120,25 @@ void putFile(const std::string &filename, const int &client_sock, unsigned int c
 			if(write(fd, output, bytesRecieved) != bytesRecieved)
 				throw "Write error to file.\n";
 		}
-		
-		// if terminated, stop reading
+   
+	  // if terminated, stop reading
 		if(globalTable[cid]) {
-			//std::cout << "Server is stopping reading\n";
 			// remove file
+      std::cout << "Exiting: " << output << "\n";
+      strcpy(buffer, output);
+      std::cout << "Copied: " << buffer << "\n";
+      commandAlreadyRecieved = true;
 			remove(filename.c_str());
 			break;
 		}
 
 		bytesLeft -= bytesRecieved;
 	}
-
+  
+  // remove file lock
+  flock(fd, LOCK_UN);
+  std::cout << "Lock " << pthread_self() << " released\n";
+  
 	if(close(fd) == -1)
 		throw "Failed to close the file.\n";
 }

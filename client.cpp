@@ -21,6 +21,7 @@
 int sockfd, sockfd2;
 unsigned int cid;
 pthread_t tid;
+bool done_sending = false;
 
 //string to int mappings
 std::unordered_map<std::string, int> code = {
@@ -119,7 +120,7 @@ int main(int argc, char **argv) {
 					prevInput = input;
 					isBackground = true;
 				}
-
+        done_sending = false;
 				//switch on result
 				switch(option) {
 					case 2: {//get
@@ -178,12 +179,12 @@ int main(int argc, char **argv) {
 						unsigned int cidInput = atoi(cidString.c_str());
 						std::cout <<"Terminating...\n\n";
 
-						// send terminate command to server
-						if(send(sockfd2, &cidInput, sizeof(cidInput), 0) == -1)
-							throw "Failed to send the cid to the server.";
-
 						std::string commandType = prevInput.substr(0,3);
 						if(commandType.compare("get") == 0) {
+						  // send terminate command to server
+  						if(send(sockfd2, &cidInput, sizeof(cidInput), 0) == -1)
+							  throw "Failed to send the cid to the server.";
+                                        
 							// clean up get/put command
 							pthread_cancel(tid);
 							std::string prevFile = prevInput.substr(4, input.length() - 2);
@@ -201,10 +202,12 @@ int main(int argc, char **argv) {
 							// remove file
 							remove(prevFile.c_str());
 						} else {
-							sleep(1); // need to wait one second on put to make sure the server dosen't get blocked on reading
-							pthread_cancel(tid);
-						}
-
+							done_sending = true;
+              sleep(1);
+					  	// send terminate command to server
+						  if(send(sockfd2, &cidInput, sizeof(cidInput), 0) == -1)
+							  throw "Failed to send the cid to the server.";
+						  }
 						break;
 					}
 
@@ -262,15 +265,8 @@ void handleGetCommand(const int &sockfd, const std::string &input) {
 	//check for files existence
 	std::string file = input.substr(4, input.length());
 
-	// check if the file already exists in current directory
-	FILE* fp;
-	fp = fopen(file.c_str(), "r");
 
-	if(fp) {
-		fclose(fp);
-		throw "File already exists in current directory, won't overwrite.\n";
-	}
-
+  // send command to server
 	if(send(sockfd, input.c_str(), BUFFSIZE, 0) == -1)
 		throw "Failed to send the file for 'get' to the server.";
 
@@ -344,14 +340,6 @@ void handlePutCommand(const int &sockfd, const std::string &input) {
 		throw "Failed to receive data from the server.";
 	std::cout << "Put executed with cid of " << cid << "\n\n";
 
-	// check to make sure file dosen't exist on server
-	char fileMessage[100];
-	if(recv(sockfd,	fileMessage, sizeof(fileMessage), 0) == -1)
-		throw "Failed to receive data from the server.";
-
-	if(strcmp(fileMessage, "file does not exist") != 0)
-		throw "File already exists on the server.";
-
 	int fd;
 	if((fd = open(fileName.c_str(), O_RDONLY)) == -1)
 			throw "Failed to open file.";
@@ -370,9 +358,12 @@ void handlePutCommand(const int &sockfd, const std::string &input) {
 		int bytesRead = read(fd, buffer, BUFFSIZE);
 		if(send(sockfd, buffer, bytesRead, 0) == -1)
 			throw "Failed to send 'ls' message to client.\n";
+    if(done_sending) {
+      break;
+    }
 
 		bytesSent += bytesRead;
-		sleep(1);
+		usleep(10);
 	}
 	
 
